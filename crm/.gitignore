@@ -1,0 +1,40 @@
+# Secrets — never commit
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Vercel
+.vercel
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# ── "Main Dashboard" (ANGAD) — angad_app/ ─────────────────────────────────────
+# Large Parquet cache (~300MB; regenerated at runtime by angad_app/sync.py from
+# Mongo). GitHub rejects files >100MB, so this must never be committed.
+angad_app/data/
+angad_app/data_OLD_CLUSTER_*/
+*.parquet
+# ANGAD local secrets & runtime write-logs
+angad_app/.env
+angad_app/RELEASES/*.jsonl
+angad_app/RELEASES/daily/
+
+# Local virtualenv / test artifacts
+.venv/
+venv/
+# ANGAD one-off data exports (contain lead IDs / call-recording URLs — never commit)
+angad_app/RESCUE_SV/
+angad_app/exec_report.html
+angad_app/*.csv

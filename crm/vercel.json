@@ -1,0 +1,26 @@
+{
+  "version": 2,
+  "regions": ["bom1"],
+  "builds": [
+    {
+      "src": "dashboard.py",
+      "use": "@vercel/python",
+      "config": {
+        "maxLambdaSize": "15mb",
+        "maxDuration": 300
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "dashboard.py"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/refresh",
+      "schedule": "*/10 * * * *"
+    }
+  ]
+}

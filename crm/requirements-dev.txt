@@ -1,0 +1,4 @@
+# Dev/test-only dependencies (not installed in the Vercel/Render runtime).
+# Install with: pip install -r requirements-dev.txt
+pytest==8.3.4
+mongomock==4.3.0

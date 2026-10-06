@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #F5F1EB;
+    font-family: 'DM Sans', system-ui, sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 40px;
+  }
+
+  .call-card {
+    background: #FAF7F2;
+    border: 1px solid rgba(154,123,62,0.18);
+    border-radius: 10px;
+    width: 720px;
+    overflow: visible;
+  }
+
+  .call-card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 13px 18px;
+    cursor: pointer;
+  }
+
+  .call-card-num {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: #999;
+    min-width: 22px;
+  }
+
+  .call-card-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 20px;
+    letter-spacing: 0.04em;
+  }
+  .badge-direction {
+    background: rgba(154,123,62,0.1);
+    color: #7a5c00;
+    border: 1px solid rgba(154,123,62,0.2);
+  }
+  .badge-outcome {
+    background: rgba(40,167,69,0.1);
+    color: #1a7a34;
+    border: 1px solid rgba(40,167,69,0.2);
+  }
+  .badge-rec {
+    background: rgba(40,167,69,0.12);
+    color: #1a7a34;
+    font-size: 9px;
+    padding: 2px 7px;
+    letter-spacing: 0.05em;
+    border-radius: 20px;
+    font-weight: 600;
+  }
+
+  /* ── Duration label in header ── */
+  .duration-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    position: relative;
+  }
+
+  .dur-label {
+    font-size: 11px;
+    color: #aaa;
+    letter-spacing: 0.01em;
+  }
+
+  .dur-value {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: #777;
+    font-weight: 500;
+  }
+
+  /* ── Info button ── */
+  .dur-info-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: rgba(154,123,62,0.12);
+    color: #9a7b3e;
+    font-size: 9px;
+    font-weight: 700;
+    cursor: default;
+    border: 1px solid rgba(154,123,62,0.22);
+    line-height: 1;
+    flex-shrink: 0;
+    transition: background 0.15s;
+    font-style: normal;
+  }
+  .dur-info-btn:hover { background: rgba(154,123,62,0.28); }
+
+  /* ── Tooltip ── */
+  .dur-tooltip {
+    display: none;
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 9px);
+    transform: translateX(-30%);
+    background: #2c2416;
+    color: #f0e8d8;
+    font-size: 11px;
+    line-height: 1.6;
+    padding: 10px 13px;
+    border-radius: 8px;
+    white-space: nowrap;
+    z-index: 100;
+    pointer-events: none;
+    box-shadow: 0 4px 18px rgba(0,0,0,0.25);
+    min-width: 260px;
+  }
+  .dur-tooltip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 28%;
+    border: 5px solid transparent;
+    border-top-color: #2c2416;
+  }
+  .dur-tooltip .tt-row {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+    padding: 1px 0;
+  }
+  .dur-tooltip .tt-key {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: #d4b96a;
+    min-width: 110px;
+    flex-shrink: 0;
+  }
+  .dur-tooltip .tt-desc {
+    color: #c8bfaf;
+    font-size: 11px;
+  }
+  .dur-tooltip .tt-divider {
+    border: none;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    margin: 6px 0;
+  }
+
+  .duration-wrap:hover .dur-tooltip { display: block; }
+
+  .call-card-date {
+    font-size: 11px;
+    color: #bbb;
+    margin-left: auto;
+    font-family: 'DM Mono', monospace;
+    white-space: nowrap;
+  }
+
+  /* ── Transcript / recording area ── */
+  .call-body {
+    border-top: 1px solid rgba(154,123,62,0.1);
+    padding: 16px 18px;
+  }
+
+  .recording-player {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(154,123,62,0.05);
+    border: 1px solid rgba(154,123,62,0.14);
+    border-radius: 8px;
+    padding: 11px 14px;
+  }
+
+  .recording-dot {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(154,123,62,0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: #9a7b3e;
+    flex-shrink: 0;
+  }
+
+  .recording-info {
+    flex: 1;
+  }
+
+  .recording-label {
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    color: #aaa;
+    text-transform: uppercase;
+    margin-bottom: 5px;
+  }
+
+  audio {
+    width: 100%;
+    height: 28px;
+    display: block;
+  }
+
+  .recording-dur-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+    flex-shrink: 0;
+  }
+
+  .rec-dur-label {
+    font-size: 9px;
+    color: #bbb;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .rec-dur-value {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: #888;
+    font-weight: 500;
+  }
+
+  /* Demo */
+  .demo-label {
+    text-align: center;
+    font-size: 12px;
+    color: #999;
+    margin-bottom: 20px;
+    letter-spacing: 0.03em;
+  }
+  .spacer { height: 80px; }
+</style>
+</head>
+<body>
+<div>
+  <p class="demo-label">Hover the <strong>ⓘ</strong> next to "Call duration" to see tooltip</p>
+
+  <div class="call-card">
+    <!-- Header -->
+    <div class="call-card-header">
+      <span class="call-card-num">#1</span>
+      <div class="call-card-meta">
+        <span class="badge badge-direction">OUTBOUND</span>
+        <span class="badge badge-outcome">CONNECTED</span>
+
+        <span class="badge badge-rec">● REC</span>
+      </div>
+      <span class="call-card-date">1 Jun 2026&nbsp;&nbsp;09:31 am</span>
+      <span style="color:#ccc;font-size:13px;margin-left:10px;">▾</span>
+    </div>
+
+    <!-- Recording player -->
+    <div class="call-body">
+      <div class="recording-player">
+        <div class="recording-dot">◉</div>
+        <div class="recording-info">
+          <div class="recording-label">Call Recording</div>
+          <audio controls preload="none"></audio>
+        </div>
+        <div class="recording-dur-wrap">
+          <span class="rec-dur-label">Recording length</span>
+          <span class="rec-dur-value">41s</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="spacer"></div>
+</div>
+</body>
+</html>

@@ -1,0 +1,3344 @@
+<!-- ANGAD Analytics - SANKALPA signature: CI Team - citeam.claudemax@gmail.com - Built with Claude (Anthropic) -->
+<meta charset="utf-8">
+<title>ANGAD funnel dashboard</title>
+<style>
+:root{
+  /* warm white — paper, not screen. Warmed a further step (2026-08-08):
+     the paper carries more amber, the ink is browner than black, and every
+     categorical colour is desaturated toward earth so a long reading session
+     stays soothing rather than shouting. */
+  --bg:#f7f2ea; --panel:#fffaf3; --ink:#2b241d; --ink2:#54493d; --muted:#8a7b6b;
+  --line:#e6dccc; --grid:#efe7db; --accent:#b4653d; --chip:#f2eadd;
+  --c1:#b4653d; --c2:#4b7d70; --c3:#7d6f9f; --c4:#bf9a34; --c5:#5580a8;
+  --c6:#ab5c6c; --good:#4b7d70; --warn:#bf8a3c; --bad:#b8514a;
+}
+/* Warm white is the product decision — we do not follow the OS into black.
+   Dark mode only softens the paper, it never becomes a black screen. */
+
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:14.5px/1.55 "Inter","Segoe UI Variable Text","Segoe UI",ui-sans-serif,system-ui,
+    -apple-system,Roboto,"Helvetica Neue",Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+  text-rendering:optimizeLegibility;font-feature-settings:"tnum" 1,"cv05" 1}
+/* ============ APP SHELL: left sidebar + main column (CRM layout) ============ */
+.app{display:grid;grid-template-columns:224px 1fr;min-height:100vh}
+.app.collapsed{grid-template-columns:52px 1fr}   /* sized to the icon, not to a hidden label */
+#side{background:var(--panel);border-right:1px solid var(--line);
+  display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow:auto}
+.brand{display:flex;align-items:center;gap:9px;padding:16px 14px;font-weight:700;
+  letter-spacing:-.3px;border-bottom:1px solid var(--line)}
+.brand i{width:26px;height:26px;border-radius:7px;background:var(--accent);color:#fff;
+  display:grid;place-items:center;font-style:normal;font-weight:800;flex:none;font-size:13px}
+.app.collapsed .brand span,.app.collapsed nav button span.lbl{display:none}
+/* COLLAPSED RAIL. The group headings used to display:none entirely, which took
+   the dividers with them — 22 icons then floated in one undifferentiated
+   column, left-aligned against a rail sized for icon+label. That is what looked
+   broken. Collapsed, each heading becomes a hairline RULE instead of vanishing:
+   the five chunks survive as visible groups even without their words, so the
+   spatial memory built in the expanded view still works. Icons centre, the rail
+   narrows to fit them, and every button keeps a title tooltip. */
+.app.collapsed .navgroup{
+  height:0;padding:0;margin:9px 8px;border-top:1px solid var(--line);
+  overflow:hidden;opacity:1}
+.app.collapsed .navgroup:first-child{display:none}
+.app.collapsed #side nav{padding:6px 4px;gap:2px}
+.app.collapsed #side nav button{justify-content:center;padding:10px 0;gap:0}
+.app.collapsed #side nav button i{width:auto;font-size:15px}
+.app.collapsed .brand{justify-content:center;padding:16px 6px}
+#side nav{display:flex;flex-direction:column;gap:1px;padding:8px;border:0;margin:0}
+#side nav button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;
+  background:none;border:0;border-radius:8px;padding:9px 11px;color:var(--muted);
+  font-weight:560;font-size:13.5px}
+#side nav button:hover{background:var(--chip);color:var(--ink)}
+#side nav button.on{background:var(--accent);color:#fff}
+#side nav button i{font-style:normal;width:17px;text-align:center;flex:none;font-size:14px}
+/* Group headings are the landmarks the grouped nav depends on. Gestalt common
+   region: a visible boundary above each group makes the four chunks read as
+   four objects rather than 22 items with occasional small text. */
+.navgroup{font-size:9.5px;text-transform:uppercase;letter-spacing:.9px;color:var(--muted);
+  padding:14px 12px 5px;opacity:.85;border-top:1px solid var(--line);margin-top:8px}
+.navgroup:first-child{border-top:0;margin-top:0;padding-top:6px}
+.sidefoot{margin-top:auto;padding:10px;border-top:1px solid var(--line)}
+.sidefoot button{width:100%;font-size:12px;border-radius:8px}
+main{min-width:0;padding:0 0 80px}
+.tbar{display:flex;align-items:center;gap:14px;padding:13px 22px 9px;flex-wrap:wrap}
+.tbar h1{font-size:19px;margin:0;flex:none}
+#idSearch{flex:1;max-width:400px;min-width:180px}
+.toolbar{display:flex;align-items:center;gap:7px;padding:0 22px 8px;flex-wrap:wrap}
+.toolbar .sep{width:1px;height:24px;background:var(--line);margin:0 3px}
+.toolbar input[type=date]{padding:6px 9px;font-size:12.5px}
+.dpreset{font-size:12px;padding:5px 12px;border-radius:18px}
+.dpreset.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.mainpad{padding:0 22px}
+@media(max-width:860px){.app{grid-template-columns:60px 1fr}
+  .app .brand span,.app nav button span.lbl,.app .navgroup{display:none}}
+h1{font-size:21px;margin:0;letter-spacing:-.3px}
+h2{font-size:15px;margin:26px 0 10px;letter-spacing:-.1px}
+h3{font-size:12px;margin:0 0 10px;color:var(--muted);font-weight:650;
+  text-transform:uppercase;letter-spacing:.5px}
+.sub{color:var(--muted);font-size:12.5px}
+.topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
+.badge{font-size:11px;background:var(--chip);color:var(--muted);border-radius:20px;
+  padding:4px 11px;border:1px solid var(--line)}
+button,select,input{font:inherit;color:var(--ink);background:var(--panel);
+  border:1px solid var(--line);border-radius:7px;padding:7px 10px}
+button{cursor:pointer}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600}
+.filters{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+  padding:14px;margin:16px 0}
+.frow{display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:11px}
+.f label{display:block;font-size:11px;color:var(--muted);margin-bottom:4px;
+  text-transform:uppercase;letter-spacing:.4px}
+.f input[type=date],.f input[type=text]{width:100%}
+.ms{position:relative}
+.ms-btn{width:100%;text-align:left;display:flex;justify-content:space-between;
+  align-items:center;gap:8px;min-height:36px}
+.ms-btn .v{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ms-btn .cnt{background:var(--accent);color:#fff;border-radius:11px;padding:1px 8px;
+  font-size:11px;font-weight:650;flex:none}
+.ms-btn.active{border-color:var(--accent)}
+.ms-pop{display:none;position:absolute;z-index:40;top:calc(100% + 4px);left:0;
+  min-width:100%;max-width:340px;background:var(--panel);border:1px solid var(--line);
+  border-radius:9px;box-shadow:0 10px 32px rgba(0,0,0,.22);padding:8px}
+.ms-pop.open{display:block}
+.ms-search{width:100%;margin-bottom:6px}
+.ms-list{max-height:230px;overflow:auto}
+.ms-opt{display:flex;align-items:center;gap:8px;padding:5px 7px;border-radius:6px;
+  cursor:pointer;font-size:13px;white-space:nowrap}
+.ms-opt:hover{background:var(--chip)}
+.ms-opt input{margin:0;accent-color:var(--accent)}
+.ms-acts{display:flex;gap:6px;border-top:1px solid var(--line);margin-top:6px;padding-top:6px}
+.ms-acts button{flex:1;padding:5px;font-size:12px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;align-items:center}
+.chip{background:var(--chip);border:1px solid var(--line);border-radius:20px;
+  padding:3px 6px 3px 11px;font-size:12px;display:flex;align-items:center;gap:6px}
+.chip b{font-weight:500;color:var(--muted)}
+.chip span{cursor:pointer;color:var(--muted);font-size:15px;line-height:1;padding:0 3px}
+.chip span:hover{color:var(--ink)}
+.fbar{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center}
+.cov{font-size:11.5px;color:var(--muted);margin-top:7px}
+.cockcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:16px 0}
+.ccard{background:var(--panel);border:1px solid var(--line);border-radius:11px;
+  padding:16px 18px;cursor:pointer;transition:border-color .12s, transform .12s}
+.ccard:hover{border-color:var(--accent);transform:translateY(-1px)}
+.ccard .l{font-size:10.5px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted)}
+.ccard .v{font-size:30px;font-weight:680;letter-spacing:-.8px;margin-top:5px}
+.ccard .d{font-size:11.5px;color:var(--muted)}
+.ccard.good{border-left:4px solid #008300}
+.ccard.bad{border-left:4px solid #e34948}
+.callcard{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+  padding:15px;margin:10px 0}
+.callcard audio{width:100%;margin:8px 0}
+.tsplit{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:900px){.tsplit{grid-template-columns:1fr}}
+.tpane{background:var(--chip);border-radius:8px;padding:10px 12px;font-size:12.5px;
+  max-height:220px;overflow:auto;white-space:pre-wrap;color:var(--ink2)}
+.tpane b{display:block;margin-bottom:5px;color:var(--muted);font-size:10.5px;
+  text-transform:uppercase;letter-spacing:.5px}
+.digestbox{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+@media(max-width:1000px){.digestbox{grid-template-columns:1fr}}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(176px,1fr));gap:10px;margin:14px 0}
+.kpi{background:var(--panel);border-radius:10px;padding:12px 14px;height:124px;overflow:hidden;
+  display:grid;grid-template-rows:28px 32px 1fr;align-content:start}
+.kpi .l{font-size:9.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);
+  line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;
+  -webkit-box-orient:vertical;align-self:start}
+.kpi .v{font-size:25px;font-weight:660;margin:0;letter-spacing:-.7px;line-height:32px;
+  align-self:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi .s{font-size:10.5px;color:var(--muted);line-height:1.32;overflow:hidden;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;align-self:start}
+nav{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-top:18px;flex-wrap:wrap}
+nav button{background:none;border:0;border-bottom:2px solid transparent;padding:10px 15px;
+  font-weight:560;color:var(--muted);border-radius:0}
+nav button:hover{color:var(--ink)}
+nav button.on{color:var(--ink);border-bottom-color:var(--accent)}
+section{display:none;padding-top:4px} section.on{display:block}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start;margin-bottom:4px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;align-items:start;margin-bottom:4px}
+@media(max-width:1050px){.grid2,.grid3{grid-template-columns:1fr}}
+.card{background:var(--panel);border-radius:10px;padding:16px 18px;margin:0 0 16px}
+#s-review .card{margin-bottom:20px}
+#s-review .card h3{margin:0 0 10px}
+#s-review .card>div{margin-bottom:8px}
+#s-review .tblwrap{margin-top:10px}
+#s-review h2{margin:30px 0 12px}
+/* ---- containment pass (2026-08-08) ----
+   The classic cause of "the UI is wrong in many places": a flex/grid child
+   defaults to min-width:auto, so ONE wide table or chart inside a card pushes
+   the whole column wider than the viewport and every section inherits a
+   horizontal scrollbar. Pin the column, let the scroll happen INSIDE the
+   element that is actually too wide, never on the page.
+   NOTE: written from the structural cause, NOT verified visually — the
+   browser pane would not composite when this was applied. Re-check on screen. */
+.mainpad,main,section{min-width:0;max-width:100%}
+section>*{max-width:100%}
+.card,.kpi,.istat,.band{min-width:0;overflow:hidden}
+.card svg,.istat svg{max-width:100%;height:auto}
+.tblwrap{max-width:100%}
+/* a table that escaped its wrapper scrolls itself rather than the page */
+section>table,.card>table{display:block;overflow-x:auto;max-width:100%}
+body{overflow-x:hidden}
+
+/* ---- ONE SIZE SYSTEM (2026-08-08 cognitive-load pass) ----
+   77 charts existed at 6+ different heights. Inconsistent sizing is read as
+   MEANING — a bigger chart looks more important — so arbitrary variation makes
+   the eye rank things the data never ranked. Three sizes only, and a chart may
+   never exceed the card that holds it.
+     · default  260px  — the ordinary case
+     · .chart-s 180px  — supporting detail
+     · .chart-l 340px  — the one chart a section is actually about
+   Cards in a grid share a row height so the eye can scan across them without
+   re-anchoring on every card (saccade cost, not aesthetics). */
+.card svg{max-width:100%;height:auto;display:block}
+.card>svg,.card .chartbox svg{max-height:260px}
+.chart-s svg{max-height:180px}
+.chart-l svg{max-height:340px}
+.grid2>.card,.grid3>.card{display:flex;flex-direction:column}
+.grid2>.card>svg,.grid3>.card>svg{margin-top:auto}
+/* headings: one rhythm everywhere, so a section's structure is learnable */
+section h2{font-size:16px;margin:26px 0 10px;letter-spacing:-.01em}
+section h2:first-child{margin-top:4px}
+section h3{font-size:13.5px;margin:14px 0 8px;color:var(--ink2)}
+
+/* Still-pending cards: severity is carried on the left edge, the one place the
+   contract permits emphasis, so the eye lands on the blocking rows first. */
+#s-pending .card{border-left:3px solid var(--line)}
+#s-pending .card.pend-bad{border-left-color:var(--bad)}
+#s-pending .card.pend-warn{border-left-color:var(--warn)}
+.pendhead{display:flex;align-items:baseline;gap:12px;margin-bottom:2px}
+.pendarea{font-size:9.5px;text-transform:uppercase;letter-spacing:.9px;color:var(--muted)}
+.pendn{margin-left:auto;font-size:24px;font-weight:700;font-variant-numeric:tabular-nums}
+#s-pending .card h3{margin:2px 0 6px}
+#s-pending .card button{margin-top:10px;background:var(--chip);border:1px solid var(--line);
+  border-radius:8px;padding:7px 12px;font:inherit;font-size:12.5px;color:var(--ink2)}
+#s-pending .card button:hover{border-color:var(--accent);color:var(--ink)}
+
+/* progressive disclosure on heavy sections */
+.folded{display:none}
+.folded.open{display:block}
+button.discl{background:var(--chip);border:1px solid var(--line);border-radius:9px;
+  padding:10px 15px;color:var(--ink2);font:inherit;font-size:13px;font-weight:560;
+  margin:6px 0 22px;width:100%;text-align:left}
+button.discl:hover{border-color:var(--accent);color:var(--ink)}
+
+/* filter options carry their live count; dead-in-window options are marked */
+.ms-opt{display:flex;align-items:center;gap:8px}
+.ms-opt .optn{margin-left:auto;font-size:11px;color:var(--muted);
+  background:var(--chip);border-radius:9px;padding:1px 7px;flex:none}
+.ms-opt.dead{opacity:.45}
+.ms-opt.dead .optn{color:var(--bad)}
+
+/* Leads board (RAMA-7): the board's own filter row */
+#lbTools{flex-wrap:wrap;gap:8px;margin-bottom:12px}
+#lbTools select{background:var(--panel);color:var(--ink);border:1px solid var(--line);
+  border-radius:7px;padding:6px 9px;font:inherit;font-size:12.5px;max-width:210px}
+#lbTools select:hover{border-color:var(--accent)}
+#s-leadsboard .tblwrap{max-height:620px}
+#s-leadsboard .kpis{margin-bottom:14px}
+
+/* Daily Report: count cells are links to their constituents */
+#s-daily .tblwrap{max-height:none}
+#s-daily td.cell{cursor:pointer;color:var(--accent,#2a78d6);font-weight:600}
+#s-daily td.cell:hover{background:rgba(42,120,214,.10);text-decoration:underline}
+#s-daily tfoot td{position:sticky;bottom:0;background:var(--panel);
+  border-top:2px solid var(--line);font-weight:700}
+#s-daily thead th{position:sticky;top:0;background:var(--panel);z-index:2}
+.legend{display:flex;gap:13px;flex-wrap:wrap;margin-bottom:8px;font-size:12px;color:var(--ink2)}
+.legend i{width:10px;height:10px;border-radius:2px;display:inline-block;margin-right:5px}
+.tblwrap{overflow:auto;max-height:440px;border:1px solid var(--line);
+  border-radius:9px;background:var(--panel)}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th{position:sticky;top:0;background:var(--panel);text-align:left;padding:9px 11px;
+  border-bottom:1px solid var(--line);color:var(--muted);font-weight:640;
+  white-space:nowrap;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;z-index:1}
+td{padding:8px 11px;border-bottom:1px solid var(--grid);color:var(--ink2);
+  max-width:430px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+tr:hover td{background:var(--grid)}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+.tools{display:flex;gap:9px;align-items:center;margin-bottom:7px;flex-wrap:wrap}
+/* Captions had NO margin and no line-height: the trailing caption under a
+   table sat flush against its bottom border and ran the full column width as
+   one dense line. That is the "text at the bottom looks wrong" the user
+   reported on the Daily Report. Give it air, a readable measure, and real
+   leading — and space it away from whatever it is explaining. */
+.cap{font-size:12px;color:var(--muted);line-height:1.6;max-width:92ch;
+  margin:10px 0 0}
+.tblwrap+.cap,table+.cap,.kpis+.cap{margin-top:12px}
+.cap+.cap{margin-top:4px}
+/* the last thing in a section must not touch the viewport edge */
+section>*:last-child{margin-bottom:28px}
+.note{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--accent);
+  border-radius:7px;padding:11px 13px;color:var(--ink2);font-size:12.5px;margin:12px 0}
+.note b{color:var(--ink)}
+.tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--bg);
+  padding:6px 9px;border-radius:5px;font-size:12px;opacity:0;transition:opacity .1s;
+  z-index:99;white-space:nowrap}
+svg text{font:12.5px ui-sans-serif,system-ui,sans-serif;fill:var(--muted)}
+#busy{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;
+  align-items:center;justify-content:center;z-index:50}
+#busy>div{background:var(--panel);padding:22px 28px;border-radius:10px;
+  border:1px solid var(--line);max-width:640px}
+pre{white-space:pre-wrap;font-size:11.5px;color:var(--muted);max-height:240px;overflow:auto}
+/* ---- VAMANA UX layer: borderless depth, hierarchy, one click contract ---- */
+.card,.kpi,.ccard,.callcard,.filters,.tblwrap,.note{border:none;box-shadow:0 1px 2px rgba(15,20,30,.06),0 4px 14px rgba(15,20,30,.05)}
+@media (prefers-color-scheme:dark){.card,.kpi,.ccard,.callcard,.filters,.tblwrap,.note{box-shadow:0 1px 2px rgba(0,0,0,.4),0 4px 16px rgba(0,0,0,.3)}}
+/* SALIENCE IS RELATIVE. There are 52 .note boxes across the app and every one
+   of them carried a 3px accent bar, so the bar carried no information — when
+   everything is marked important, the marker is noise and the eye learns to
+   skip all of them, including the one that mattered. Explanatory notes now sit
+   quiet (they are read when sought, not shouted); only .note.warn keeps the
+   accent, matching the contract rule that reserves emphasis for real failure. */
+.note{border-left:3px solid var(--line);color:var(--ink2)}
+.note.warn{border-left:3px solid var(--accent);color:var(--ink)}
+.note.bad{border-left:3px solid var(--bad);color:var(--ink)}
+.card svg,.tsplit svg{max-width:100%;display:block;height:auto}
+.kpis .kpi:first-child .v{font-size:34px}
+.kpi{cursor:default}
+.kpis>.kpi{height:124px}
+.idlink{cursor:pointer;text-decoration:underline dotted;color:var(--accent)}
+.scopes{display:flex;gap:6px;flex-wrap:wrap;padding:0 22px 8px;margin:0}
+.scopes button{font-size:12px;padding:4px 12px;border-radius:20px}
+.scopes button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.fixedwin{font-size:10.5px;background:var(--chip);color:var(--muted);border-radius:12px;
+  padding:2px 9px;margin-left:8px;vertical-align:middle;letter-spacing:.3px}
+/* insight cards — red is reserved for systemic failure only */
+.insight{background:var(--panel);border-radius:10px;padding:14px 16px;margin:10px 0;
+  box-shadow:0 1px 2px rgba(15,20,30,.06),0 4px 14px rgba(15,20,30,.05);cursor:pointer}
+.insight:hover{transform:translateY(-1px)}
+.insight .role{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)}
+.insight .t{font-weight:650;margin:3px 0}
+.insight.fail{border-left:4px solid #e34948}
+.insight.warn{border-left:4px solid #d99114}
+.insight.info{border-left:4px solid var(--line)}
+/* band cards */
+.bands{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:14px 0}
+.band{background:var(--panel);border-radius:11px;padding:16px 18px;cursor:pointer;
+  box-shadow:0 1px 2px rgba(15,20,30,.06),0 4px 14px rgba(15,20,30,.05)}
+.band .n{font-size:32px;font-weight:700;letter-spacing:-.8px}
+.band .l{font-size:10.5px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted)}
+.band.on{outline:2px solid var(--accent)}
+/* lead modal */
+#lmOverlay{position:fixed;inset:0;background:rgba(10,12,16,.45);display:none;
+  align-items:flex-start;justify-content:center;z-index:60;overflow:auto;padding:4vh 12px}
+#lmOverlay.open{display:flex}
+#lmBox{background:var(--bg);border-radius:14px;max-width:1080px;width:100%;
+  box-shadow:0 20px 70px rgba(0,0,0,.4);padding:22px 26px;margin-bottom:6vh}
+#lmTabs{display:flex;gap:4px;flex-wrap:wrap;background:var(--chip);border-radius:10px;padding:5px;margin:14px 0}
+#lmTabs button{border:0;background:none;padding:8px 14px;border-radius:8px;font-weight:560;color:var(--muted)}
+#lmTabs button.on{background:var(--accent);color:#fff}
+.scorepill{display:inline-block;border-radius:16px;padding:4px 13px;font-size:12px;
+  font-weight:650;color:#fff;margin:0 6px 6px 0}
+.scorepill.green{background:#0a8a0a}.scorepill.purple{background:#8a5cd6}.scorepill.orange{background:#e07b10}
+.nacard{background:var(--chip);border-radius:9px;padding:13px 15px;color:var(--muted);font-size:12.5px}
+/* feedback */
+/* design-contract layer */
+.kpi.drillable{cursor:pointer;transition:transform .1s}
+.kpi.drillable:hover{transform:translateY(-1px);outline:1.5px solid var(--accent)}
+.expl{cursor:pointer;opacity:.45;font-size:11px;margin-left:4px;float:right}
+.expl:hover{opacity:1}
+.expl:hover{opacity:1;color:var(--accent)}
+.dqbadge{color:#d99114;font-weight:600}
+#palette{position:fixed;inset:0;background:rgba(10,12,16,.5);display:none;z-index:70;
+  align-items:flex-start;justify-content:center;padding-top:14vh}
+#palette.open{display:flex}
+#palette>div{background:var(--panel);border-radius:12px;width:520px;max-width:92vw;
+  box-shadow:0 20px 70px rgba(0,0,0,.45);padding:12px}
+#palInput{width:100%;font-size:16px;padding:10px 12px}
+#palList{max-height:300px;overflow:auto;margin-top:8px}
+.palRow{padding:8px 10px;border-radius:7px;cursor:pointer;font-size:13.5px}
+.palRow:hover,.palRow.on{background:var(--chip)}
+.savebar{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+/* Filters live in a modal (Inncircles pattern); chips stay on the toolbar */
+.fh-btn{border-radius:20px;font-weight:640;padding:7px 17px}
+.fh-btn .cnt{background:var(--accent);color:#fff;border-radius:11px;padding:1px 8px;
+  font-size:11px;margin-left:7px}
+.fh-chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:0 22px 10px}
+#filterModal{position:fixed;inset:0;background:rgba(10,12,16,.45);z-index:65;
+  display:none;align-items:flex-start;justify-content:center;padding:6vh 12px;overflow:auto}
+#filterModal.open{display:flex}
+#filterModal>div{background:var(--panel);border-radius:14px;width:660px;max-width:96vw;
+  padding:20px 22px;box-shadow:0 20px 70px rgba(0,0,0,.4)}
+.filters .frow{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+.fmhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.fmhead h2{margin:0;font-size:17px}
+/* insights summary panel */
+.ipanel{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:14px 0}
+.istat{background:var(--panel);border-radius:11px;padding:15px 17px;cursor:pointer;
+  box-shadow:0 1px 2px rgba(15,20,30,.06),0 4px 14px rgba(15,20,30,.05)}
+.istat .n{font-size:30px;font-weight:700;letter-spacing:-.8px}
+.istat .l{font-size:10.5px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted)}
+.istat.fail .n{color:#e34948}.istat.warn .n{color:#d99114}
+/* calling-turns viewer */
+.turnwrap{max-height:460px;overflow:auto;padding:4px 2px}
+.turn{display:flex;gap:10px;margin:9px 0;align-items:flex-start}
+.turn.agent{flex-direction:row}.turn.cust{flex-direction:row-reverse}
+.tbub{max-width:74%;padding:9px 13px;border-radius:13px;font-size:13px;line-height:1.5}
+.turn.agent .tbub{background:var(--chip);color:var(--ink2);border-top-left-radius:4px}
+.turn.cust .tbub{background:var(--accent);color:#fff;border-top-right-radius:4px}
+.tmark{font-size:10px;color:var(--muted);white-space:nowrap;padding-top:11px;letter-spacing:.3px}
+.tmark.good{color:#0a8a0a}.tmark.warn{color:#d99114}.tmark.bad{color:#e34948;font-weight:650}
+.cifsub{display:flex;gap:4px;flex-wrap:wrap;background:var(--chip);border-radius:10px;
+  padding:5px;margin:16px 0 14px}
+.cifsub button{border:0;background:none;border-radius:8px;padding:8px 15px;
+  font-weight:570;color:var(--muted);font-size:13px}
+.cifsub button.on{background:var(--accent);color:#fff}
+.callpick{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
+.callpick button{font-size:12px;border-radius:18px;padding:5px 13px}
+.callpick button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+</style>
+
+<div class="app" id="app">
+  <aside id="side">
+    <div class="brand"><i>A</i><span>ANGAD</span></div>
+    <nav id="nav"></nav>
+    <div class="sidefoot">
+      <button id="sideToggle" title="Collapse the sidebar">⟨ Collapse</button>
+    </div>
+  </aside>
+
+  <main>
+    <div class="tbar">
+      <h1 id="pageTitle">Overview</h1>
+      <input id="idSearch" placeholder="Search MLID · Lead ID · Source Lead ID">
+      <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <span class="sub" id="sub">loading…</span>
+        <span class="badge" id="piiBadge">local only · 127.0.0.1</span>
+        <label class="badge" id="piiWrap" style="cursor:pointer;display:none">
+          <input type="checkbox" id="piiToggle" style="vertical-align:-2px;margin-right:5px">
+          Show phone numbers
+        </label>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <!-- DATE RANGE — always visible, never hidden behind a panel -->
+      <span class="cap" title="When the call happened">Action</span>
+      <input type="date" id="f_from" title="Action taken from (call date)">
+      <span class="cap">→</span>
+      <input type="date" id="f_to" title="Action taken to (call date)">
+      <span class="sep"></span>
+      <span class="cap" title="When the lead entered the system">Born</span>
+      <input type="date" id="f_born_from" title="Lead born from">
+      <span class="cap">→</span>
+      <input type="date" id="f_born_to" title="Lead born to">
+      <div id="dpresets" style="display:flex;gap:5px;flex-wrap:wrap"></div>
+      <div class="sep"></div>
+      <button class="fh-btn" id="fhToggle">⚙ Filters<span class="cnt" id="fhCount" style="display:none">0</span></button>
+      <button id="fhReset" title="Clear every filter">Clear</button>
+      <div class="sep"></div>
+      <select id="unitSel" title="Counting unit">
+        <option value="calls">Count: call events</option>
+        <option value="humans">Count: unique humans</option>
+      </select>
+      <select id="audSel" title="Audience — NRI and RI live in different time zones">
+        <option value="">Audience: all</option>
+        <option value="RI (India · Plivo)">RI only (India)</option>
+        <option value="NRI (Telnyx)">NRI only (international)</option>
+      </select>
+      <button id="refresh" title="Pull fresh data from Mongo (read-only)">↻ Refresh</button>
+    </div>
+    <div class="fh-chips" id="fhChips"></div>
+    <div class="scopes" id="scopes"></div>
+    <div class="mainpad">
+    <div class="kpis" id="kpis"></div>
+  <section id="s-today" class="on"></section>
+  <section id="s-daily"></section>
+  <section id="s-leadsboard"></section>
+  <section id="s-pending"></section>
+  <section id="s-dbhealth"></section>
+  <section id="s-daybyday"></section>
+  <section id="s-projects"></section>
+  <section id="s-attend"></section>
+  <section id="s-qa"></section>
+  <section id="s-builder"></section>
+  <section id="s-funnel3"></section>
+  <section id="s-insights"></section>
+  <section id="s-cif"></section>
+  <section id="s-globe"></section>
+  <section id="s-fboard" style="display:none"></section>
+  <section id="s-review"></section>
+  <section id="s-profile"></section>
+  <section id="s-eras"></section>
+  <section id="s-numbers"></section>
+  <section id="s-audit"></section>
+  <section id="s-integrity"></section>
+  <section id="s-positives"></section>
+  <section id="s-negatives"></section>
+  <section id="s-whatsapp"></section>
+  <section id="s-cohorts"></section>
+  <section id="s-visits"></section>
+  <section id="s-intent"></section>
+  <section id="s-metrics"></section>
+    </div><!-- /mainpad -->
+  </main>
+</div>
+
+<div id="filterModal">
+  <div>
+    <div class="fmhead">
+      <h2>Filters</h2>
+      <button onclick="document.getElementById('filterModal').classList.remove('open')">✕</button>
+    </div>
+    <div class="filters" id="filters"></div>
+  </div>
+</div>
+
+<div class="tip" id="tip"></div>
+<div id="busy"><div><b id="busyTitle">Working…</b><pre id="busyLog"></pre></div></div>
+
+<!-- lead modal — the ONE way a lead opens, from anywhere -->
+<div id="lmOverlay">
+  <div id="lmBox">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h2 id="lmTitle" style="margin:0">Lead</h2>
+      <button onclick="document.getElementById('lmOverlay').classList.remove('open')">✕ Close</button>
+    </div>
+    <div class="cap" id="lmSub"></div>
+    <div id="lmHead"></div>
+    <div id="lmTabs"></div>
+    <div id="lmBody"></div>
+  </div>
+</div>
+
+<div id="palette"><div>
+  <input id="palInput" placeholder="Jump to… lead id (992727 / 1002-LOFT / LEAD-…), tab name, or scope (today · 7d · era · all)">
+  <div id="palList"></div>
+  <div class="cap" style="margin-top:6px">Ctrl+K anywhere · Enter opens · Esc closes</div>
+</div></div>
+
+
+
+</div>
+
+<script>
+const TOKEN = "__TOKEN__";
+const tip = document.getElementById('tip');
+let D = null, OPT = null, loadSeq = 0;
+
+const esc = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const num = v => typeof v==='number' ? (Number.isInteger(v)?v.toLocaleString():v.toFixed(2)) : esc(v);
+const el = (t,c,h)=>{const e=document.createElement(t); if(c)e.className=c; if(h!=null)e.innerHTML=h; return e;};
+
+function hover(node, html){
+  node.addEventListener('mousemove', e=>{
+    tip.innerHTML=html; tip.style.opacity=1;
+    tip.style.left=Math.min(e.clientX+12, innerWidth-tip.offsetWidth-8)+'px';
+    tip.style.top=(e.clientY-34)+'px';
+  });
+  node.addEventListener('mouseleave', ()=> tip.style.opacity=0);
+}
+
+/* ---------------- charts ---------------- */
+const NS='http://www.w3.org/2000/svg';
+const mk=(t,a={})=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);return e;};
+
+const PALETTE=['var(--c1)','var(--c2)','var(--c3)','var(--c4)','var(--c5)','var(--c6)'];
+function hbar(data,{unit='',color=null,dim=null,probe=null}={}){
+  if(!data||!data.length) return el('div','cap','No data for this selection.');
+  // SIZE DISCIPLINE. Height was purely data.length*26, which produced 21
+  // distinct chart heights across the app from 62px to 426px. Inconsistent
+  // size is read as importance — a taller chart looks like it matters more —
+  // so arbitrary variation makes the eye rank things the data never ranked.
+  // Cap rows at 12 (the tail is noise in a ranked bar chart and the drill-down
+  // has the full list) and floor the height so a 2-row chart still reads as a
+  // chart rather than a stray label.
+  const TRIM=data.length>12;
+  if(TRIM){ data=data.slice(0,12); }
+  const rowH=26,pad=5,labelW=178,max=Math.max(1,...data.map(d=>d.value));
+  const h=Math.max(110,data.length*rowH+pad*2);
+  const svg=mk('svg',{viewBox:`0 0 740 ${h}`,width:'100%',height:h});
+  data.forEach((d,i)=>{
+    const y=pad+i*rowH;
+    const t=mk('text',{x:labelW-8,y:y+15,'text-anchor':'end'});
+    t.textContent=d.label.length>26?d.label.slice(0,25)+'…':d.label;
+    hover(t,esc(d.label)); svg.appendChild(t);
+    const w=Math.max(2,(740-labelW-80)*d.value/max);
+    const r=mk('rect',{x:labelW,y:y+4,width:w,height:17,rx:4,
+      fill:d.color||color||PALETTE[i%PALETTE.length]});
+    hover(r,`<b>${esc(d.label)}</b><br>${d.value.toLocaleString()}${unit}`+(d.pct!=null?` · ${d.pct}%`:'')+
+      (probe?'<br><i>click to investigate these rows</i>':dim?'<br><i>click to filter by this</i>':''));
+    if(probe){                     // UNIVERSAL PROBE: open the story behind the bar
+      r.style.cursor='pointer';
+      r.addEventListener('click',()=>openSlice(probe,d.label,d.value));
+    } else if(dim){                // click-to-filter: any bar on a filterable
+      r.style.cursor='pointer';    // dimension applies itself as a filter
+      r.addEventListener('click',()=>{
+        if(!SEL[dim]) SEL[dim]=new Set();
+        SEL[dim].clear(); SEL[dim].add(String(d.label));
+        buildFilters(); load();
+      });
+    }
+    svg.appendChild(r);
+    const v=mk('text',{x:labelW+w+7,y:y+16,fill:'var(--ink2)'});
+    v.textContent=d.value.toLocaleString()+(d.pct!=null?` (${d.pct}%)`:'');
+    svg.appendChild(v);
+  });
+  // never truncate silently — a chart that hides rows without saying so is a
+  // chart that lies about its own completeness
+  if(TRIM){
+    const box=el('div'); box.appendChild(svg);
+    box.appendChild(el('div','cap','Top 12 shown — click any bar for the full list behind it.'));
+    return box;
+  }
+  return svg;
+}
+
+function vstack(labels,series,{h=250,unit=''}={}){
+  if(!labels||!labels.length) return el('div','cap','No data.');
+  const padL=54,padB=28,padT=8,w=1000,ih=h-padB-padT,iw=w-padL-12;
+  const totals=labels.map((_,i)=>series.reduce((s,x)=>s+(x.values[i]||0),0));
+  const max=Math.max(1,...totals);
+  const svg=mk('svg',{viewBox:`0 0 ${w} ${h}`,width:'100%',height:h});
+  for(let g=0;g<=4;g++){
+    const y=padT+ih-ih*g/4;
+    svg.appendChild(mk('line',{x1:padL,x2:w-12,y1:y,y2:y,stroke:'var(--grid)','stroke-width':1}));
+    const t=mk('text',{x:padL-8,y:y+4,'text-anchor':'end'});
+    t.textContent=Math.round(max*g/4).toLocaleString(); svg.appendChild(t);
+  }
+  const bw=Math.max(2,iw/labels.length-2);
+  labels.forEach((lb,i)=>{
+    const x=padL+iw*i/labels.length; let acc=0;
+    series.forEach(s=>{
+      const v=s.values[i]||0; if(!v) return;
+      const bh=ih*v/max, y=padT+ih-bh-acc;
+      const r=mk('rect',{x,y,width:bw,height:Math.max(1,bh-2),rx:2,fill:s.color,
+        stroke:'var(--panel)','stroke-width':2});
+      hover(r,`<b>${esc(lb)}</b><br>${esc(s.name)}: ${v.toLocaleString()}${unit}<br>total ${totals[i].toLocaleString()}`);
+      svg.appendChild(r); acc+=bh;
+    });
+    const step=Math.max(1,Math.ceil(labels.length/14));
+    if(i%step===0){
+      const t=mk('text',{x:x+bw/2,y:h-9,'text-anchor':'middle'});
+      t.textContent=lb.length>9?lb.slice(5):lb; svg.appendChild(t);
+    }
+  });
+  return svg;
+}
+
+/* line chart — for rates/trends where a stacked bar misleads */
+function vline(labels, series, {h=240, unit='', ymax=null}={}){
+  if(!labels||!labels.length) return el('div','cap','No data.');
+  const padL=54,padB=28,padT=10,w=1000,ih=h-padB-padT,iw=w-padL-14;
+  const max=ymax||Math.max(1,...series.flatMap(s=>s.values.filter(v=>v!=null)));
+  const svg=mk('svg',{viewBox:`0 0 ${w} ${h}`,width:'100%',height:h});
+  for(let g=0;g<=4;g++){
+    const y=padT+ih-ih*g/4;
+    svg.appendChild(mk('line',{x1:padL,x2:w-14,y1:y,y2:y,stroke:'var(--grid)','stroke-width':1}));
+    const t=mk('text',{x:padL-8,y:y+4,'text-anchor':'end'});
+    t.textContent=Math.round(max*g/4).toLocaleString()+unit; svg.appendChild(t);
+  }
+  const X=i=>padL+(labels.length===1?iw/2:iw*i/(labels.length-1));
+  const Y=v=>padT+ih-ih*Math.min(v,max)/max;
+  series.forEach(s=>{
+    const pts=s.values.map((v,i)=>v==null?null:[X(i),Y(v)]);
+    let d='', pen=false;
+    pts.forEach(pt=>{ if(!pt){pen=false;return;} d+=(pen?'L':'M')+pt[0].toFixed(1)+' '+pt[1].toFixed(1); pen=true; });
+    svg.appendChild(mk('path',{d,fill:'none',stroke:s.color,'stroke-width':2,
+      'stroke-linejoin':'round','stroke-linecap':'round'}));
+    pts.forEach((pt,i)=>{
+      if(!pt) return;
+      const dot=mk('circle',{cx:pt[0],cy:pt[1],r:labels.length>40?2.5:4,fill:s.color,
+        stroke:'var(--panel)','stroke-width':2});
+      hover(dot,`<b>${esc(labels[i])}</b><br>${esc(s.name)}: ${s.values[i]}${unit}`);
+      svg.appendChild(dot);
+    });
+  });
+  labels.forEach((lb,i)=>{
+    const step=Math.max(1,Math.ceil(labels.length/14));
+    if(i%step===0){const t=mk('text',{x:X(i),y:h-9,'text-anchor':'middle'});
+      t.textContent=String(lb).length>9?String(lb).slice(5):lb; svg.appendChild(t);}
+  });
+  return svg;
+}
+
+function heatmap(H){
+  const box=el('div');
+  const tbl=el('table'); tbl.style.fontSize='10.5px';
+  let html='<thead><tr><th></th>'+H.hours.map(h=>`<th style="padding:3px 4px;text-align:center">${h}</th>`).join('')+'</tr></thead><tbody>';
+  H.weekdays.forEach((w,i)=>{
+    html+=`<tr><th style="padding:3px 6px">${w.slice(0,3)}</th>`;
+    H.hours.forEach((_,j)=>{
+      const r=H.rate[i][j], n=H.dials[i][j];
+      let bg='transparent', fg='var(--muted)';
+      if(r!=null&&n>=20){
+        const t=Math.min(r,25)/25;            // 0..25% connect maps to ramp
+        bg=`rgba(42,120,214,${0.08+0.72*t})`; // one-hue sequential ramp
+        fg=t>0.55?'#fff':'var(--ink2)';
+      } else if(n>0){ bg='var(--grid)'; }
+      html+=`<td style="padding:3px 2px;text-align:center;background:${bg};color:${fg}" `+
+            `title="${w} ${H.hours[j]}:00 — ${n.toLocaleString()} dials, ${r==null?'n/a':r+'% connect'}">`+
+            `${r!=null&&n>=20?Math.round(r):''}</td>`;
+    });
+    html+='</tr>';
+  });
+  tbl.innerHTML=html+'</tbody>';
+  const wrap=el('div'); wrap.style.overflow='auto'; wrap.appendChild(tbl);
+  box.appendChild(wrap);
+  box.appendChild(el('div','cap','Cell = connect % (IST). Blank cells have under 20 dials. '+
+    'Darker = better. Hover for exact numbers.'));
+  return box;
+}
+
+function legend(series){
+  return el('div','legend', series.map(s=>
+    `<span><i style="background:${s.color}"></i>${esc(s.name||s.label)}</span>`).join(''));
+}
+
+function tableEl(t){
+  const box=el('div');
+  if(!t||!t.rows||!t.rows.length){ box.appendChild(el('div','cap','No rows for this selection.')); return box; }
+  const tools=el('div','tools');
+  const inp=el('input'); inp.placeholder='Filter these rows…'; inp.style.minWidth='240px';
+  inp.oninput=()=>{const q=inp.value.toLowerCase();
+    wrap.querySelectorAll('tbody tr').forEach(tr=>{
+      tr.style.display=tr.textContent.toLowerCase().includes(q)?'':'none';});};
+  tools.appendChild(inp);
+  const dl=el('button',null,'Download CSV');
+  dl.onclick=()=>{
+    // contract rule 12: exports carry the filter state in the filename and a
+    // header row stating the scope used
+    const q=currentQuery();
+    const chips=Object.entries(q).filter(([k])=>!['t','from','to'].includes(k))
+      .map(([k,v])=>k+'='+String(v).split('|').join('+')).join('_').slice(0,80);
+    const fname=['angad',q.from||'all',q.to||'now',chips].filter(Boolean).join('_')
+      .replace(/[^A-Za-z0-9_+=.-]/g,'')+'.csv';
+    const header='# ANGAD export · window '+(q.from||'(open)')+' → '+(q.to||'(open)')+
+      ' · filters: '+(chips||'none')+' · rows shown '+t.shown+' of '+t.total+
+      ' · generated '+new Date().toISOString().slice(0,16);
+    const rows=[header,t.cols.join(',')].concat(t.rows.map(r=>r.map(v=>{
+      const s=String(v==null?'':v); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;
+    }).join(',')));
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob([rows.join('\n')],{type:'text/csv'}));
+    a.download=fname; a.click();
+  };
+  tools.appendChild(dl);
+  tools.appendChild(el('span','cap',`${t.shown.toLocaleString()} of ${t.total.toLocaleString()} rows`));
+  box.appendChild(tools);
+  const wrap=el('div','tblwrap');
+  // identity columns are links: click a lead_id / MLID / lead_ref anywhere
+  // and its full profile opens on the MLID Profile tab
+  const idCols=t.cols.map((c,i)=>['MLID','Lead ID','Source Lead ID','lead_ref','lead_id','mlid','masterleadid','source_lead_id'].includes(c)?i:-1).filter(i=>i>=0);
+  wrap.innerHTML='<table><thead><tr>'+t.cols.map(c=>`<th>${esc(c)}</th>`).join('')+
+    '</tr></thead><tbody>'+t.rows.map(r=>'<tr>'+r.map((v,i)=>
+      `<td class="${typeof v==='number'?'num':''}${idCols.includes(i)&&v!=null&&v!==''?' idlink':''}" title="${esc(v)}">${num(v)}</td>`
+    ).join('')+'</tr>').join('')+'</tbody></table>';
+  if(idCols.length) wrap.querySelectorAll('td.idlink').forEach(td=>{
+    td.title='Open this lead (modal)';
+    td.onclick=()=>openLeadModal(td.textContent.trim());
+  });
+  box.appendChild(wrap);
+  return box;
+}
+
+/* jump to the MLID Profile tab and load an id */
+function openProfile(id){
+  document.querySelectorAll('nav button').forEach(b=>{ if(b.textContent==='MLID Profile') b.click(); });
+  const inp=document.getElementById('profQ');
+  if(inp){ inp.value=id; loadProfile(id); }
+}
+
+function slotCard(title,slot,color){
+  const d=el('div','card');
+  d.appendChild(el('h3',null,esc(title)));
+  if(!slot||!slot.data||!slot.data.length){
+    d.appendChild(el('div','cap','Not captured on any call in this selection.'));
+    return d;
+  }
+  d.appendChild(hbar(slot.data,{color:color}));
+  d.appendChild(el('div','cov','Captured on <b>'+slot.filled.toLocaleString()+
+    '</b> of '+slot.of.toLocaleString()+' transcribed calls ('+slot.pct+
+    '%). The rest left this field blank \u2014 the bars are that subset, not the whole selection.'));
+  return d;
+}
+
+function card(title,node,caption){
+  const d=el('div','card');
+  if(title) d.appendChild(el('h3',null,esc(title)));
+  if(node) d.appendChild(node);
+  if(caption) d.appendChild(el('div','cap',caption));
+  return d;
+}
+function renderVisits(s, V){
+  s.appendChild(el('h2',null,'Site visits'));
+  if(V.note) s.appendChild(el('div','note',V.note));
+  if(V.kpis) s.appendChild(kpiRow(V.kpis));
+  (V.charts||[]).forEach(pair=>{
+    if(pair.length===2) s.appendChild(grid(2, card(pair[0].title,hbar(pair[0].data)),
+                                              card(pair[1].title,hbar(pair[1].data))));
+    else s.appendChild(card(pair[0].title,hbar(pair[0].data)));
+  });
+  if(V.funnel) s.appendChild(card('Visit funnel', hbar(V.funnel)));
+  if(V.table){ s.appendChild(el('h2',null,'Every visit on record')); s.appendChild(tableEl(V.table)); }
+  if(V.gap) { const n=el('div','note',esc(V.gap)); n.style.borderLeftColor='#e34948'; s.appendChild(n); }
+}
+
+/* metrics with a real /api/drill branch — kept in sync with build_drill() */
+const DRILLABLE=new Set(['Calls triggered','Dial attempts','Unique numbers',
+  'Unique humans','Humans dialled','Connected','Humans connected','Booked',
+  'Humans booked (call outcome)','Dropped','Qualified',
+  'Humans in real conversation','Humans DNC','Median talk time','₹ spend (approx)']);
+
+/* KPI row under the design contract: every number is a link (rule 1),
+   every number can explain itself (rule 5), data-quality badges inline
+   (rule 6), previous-period delta as a toggle (rule 8). */
+function kpiRow(list){
+  const box=el('div','kpis');
+  list.filter(Boolean).forEach(k=>{
+    // CONTRACT AT RENDER TIME. The server walks its own payload, but several
+    // sections (Daily Report, Leads board, QA, Builder, Attendance) are built
+    // by their own endpoints and never pass through it — 45 visible cards had
+    // no contract for that reason. Registering here means a card cannot reach
+    // the screen without being able to answer "what do you count?", whichever
+    // endpoint produced it.
+    if(D&&k.label){
+      D.card_contracts=D.card_contracts||{};
+      if(!D.card_contracts[k.label]&&!(D.lineage&&D.lineage[k.label])){
+        D.card_contracts[k.label]={
+          contract:'PARTIAL',
+          def:(k.sub||'').trim()||'No written definition yet — this card states a '+
+              'value and its source, but its constituents have not been contracted.',
+          num:null,den:null,
+          window:'current date filter',filters:'all active filters',
+          src:k.src||'not stated on the card',
+          excl:'PARTIAL contract: derived from the card’s own sub-label and '+
+               'source at render time, NOT verified against a query. Treat the '+
+               'number as directional until it is.'};
+      }
+    }
+    const d=el('div','kpi'+(k.drill?' drillable':''));
+    let deltaHtml='';
+    if(D&&D.prev&&window.CMP_ON){
+      const map={'Calls triggered':'dials','Connected':'connected','Booked':'booked',
+                 'Dial attempts':'dials'};
+      const pk=map[k.label];
+      if(pk!=null&&D.prev[pk]!=null){
+        const cur=parseInt(String(k.value).replace(/[^0-9]/g,''))||0;
+        const dl=cur-D.prev[pk];
+        deltaHtml=`<div class="s" style="color:${dl>=0?'#0a8a0a':'#e34948'}">`+
+          `${dl>=0?'▲':'▼'} ${Math.abs(dl).toLocaleString()} vs prev period</div>`;
+      }
+    }
+    d.innerHTML=`<div class="l">${esc(k.label)}
+        <span class="expl" title="Explain this number">ⓘ</span></div>
+      <div class="v">${esc(k.value)}</div>
+      ${k.sub?`<div class="s">${esc(k.sub)}</div>`:''}${deltaHtml}
+      ${k.dq?`<div class="s dqbadge" title="${esc(k.dq.why)}">⚠ ${k.dq.n.toLocaleString()} flagged rows</div>`:''}
+      ${k.src?`<div class="s" style="opacity:.55">${esc(k.src)}</div>`:''}`;
+    // only advertise a drill where one actually exists — a card that promises
+    // a pop-box and returns an error is worse than a card that stays quiet
+    if(DRILLABLE.has(k.label)){
+      d.classList.add('drillable');
+      d.onclick=e=>{ if(e.target.classList.contains('expl'))return; openDrill(k.label,k.value); };
+      d.title='Click: the exact rows behind this number (pop-box) · ⓘ: definition';
+    } else if(k.drill){
+      d.classList.add('drillable');
+      d.onclick=e=>{ if(e.target.classList.contains('expl'))return; gotoTab(k.drill); };
+      d.title='Click: open the section behind this number · ⓘ: definition';
+    } else {
+      d.title='ⓘ: what this number means';
+    }
+    d.querySelector('.expl').onclick=e=>{ e.stopPropagation(); explain(k.label); };
+    box.appendChild(d);
+  });
+  return box;
+}
+
+/* Drill pop-box (contract rules 1+2): click a number → the rows behind it,
+   with aggregate-vs-rows parity shown on the box itself. */
+async function openDrill(label,value){
+  const ov=document.getElementById('lmOverlay'); ov.classList.add('open');
+  document.getElementById('lmTitle').textContent=label+' — '+value;
+  document.getElementById('lmSub').textContent='loading the exact rows behind this number…';
+  ['lmHead','lmTabs','lmBody'].forEach(x=>document.getElementById(x).innerHTML='');
+  const q=currentQuery(); q.metric=label;
+  let R;
+  try{ R=await (await fetch('/api/drill?'+new URLSearchParams(q))).json(); }
+  catch(e){ document.getElementById('lmSub').textContent='server unreachable'; return; }
+  const body=document.getElementById('lmBody');
+  if(R.error){
+    document.getElementById('lmSub').textContent='';
+    body.innerHTML='<div class="nacard">'+esc(R.error)+'</div>';
+    if(D.lineage&&D.lineage[label]) explain(label);
+    return;
+  }
+  // Parity is only meaningful for COUNT metrics. A median or a sum is a
+  // statistic over the rows, not a row count — claiming a mismatch there
+  // would be a lie (audit findings #10, #11).
+  const vDigits=String(value).replace(/[^0-9]/g,'');
+  const isPlaceholder=/^(—|-|NA|N\/A)$/i.test(String(value).trim());
+  const isCount=(R.count_kind!=='measure') && !isPlaceholder && vDigits!=='';
+  const parity=isCount && vDigits===String(R.count).replace(/[^0-9]/g,'');
+  document.getElementById('lmSub').innerHTML=
+    'window '+esc(R.window)+' · card shows <b>'+esc(value)+'</b> · drill returns <b>'+
+    esc(R.count)+'</b> over '+R.rows_total.toLocaleString()+' rows — '+
+    (!isCount
+      ? '<span style="opacity:.65">'+(isPlaceholder
+          ? 'no rows qualify under these filters; the rows below are the population behind the metric'
+          : 'a statistic, not a count — the rows below are the population it is computed over')+'</span>'
+      : parity
+        ? '<span style="color:#0a8a0a">MATCH ✓ (one metric, one query)</span>'
+        : '<span style="color:#e34948">MISMATCH — build-breaking bug, please report via Feedback</span>');
+  if(R.lineage) body.appendChild(el('div','note','<b>Definition:</b> '+esc(R.lineage.def)+
+    ' <span class="cap">· source: '+esc(R.lineage.src)+'</span>'));
+  body.appendChild(tableEl(R.tbl));
+  body.appendChild(el('div','cap','Click any id to open that lead · Download CSV carries this filter state.'));
+}
+
+/* UNIVERSAL PROBE — click any bar and get the whole story behind those rows:
+   who they were, what they talked about, whether they got frustrated, whether
+   WhatsApp went out, and why they were called so many times. */
+async function openSlice(dim,label,value){
+  const ov=document.getElementById('lmOverlay'); ov.classList.add('open');
+  document.getElementById('lmTitle').textContent=label+' — '+Number(value).toLocaleString()+' rows';
+  document.getElementById('lmSub').textContent='investigating…';
+  ['lmHead','lmTabs','lmBody'].forEach(x=>document.getElementById(x).innerHTML='');
+  const q=currentQuery(); q.dim=dim;
+  q.value=(dim==='attempts'||dim==='hour') ? String(label).replace(/[^0-9.]/g,'') : label;
+  let S;
+  try{ S=await (await fetch('/api/slice?'+new URLSearchParams(q))).json(); }
+  catch(e){ document.getElementById('lmSub').textContent='server unreachable'; return; }
+  const body=document.getElementById('lmBody');
+  if(S.error){ document.getElementById('lmSub').textContent='';
+    body.innerHTML='<div class="nacard">'+esc(S.error)+'</div>'; return; }
+  document.getElementById('lmSub').textContent=
+    dim+' = '+S.value+' · window '+S.window+' · '+S.calls.toLocaleString()+
+    ' calls across '+S.leads.toLocaleString()+' leads';
+  document.getElementById('lmHead').appendChild(kpiRow(S.facts));
+  const tabs=[
+    ['Why these rows',()=>{const d=el('div');
+      d.appendChild(el('div','note',esc(S.note)));
+      const g=el('div','grid2');
+      g.appendChild(card('Outcomes in this slice',hbar(S.outcome_mix),'angad.calls.outcome'));
+      g.appendChild(card('Dial status',hbar(S.status_mix),'angad.calls.status'));
+      d.appendChild(g);
+      if(S.drop_mix&&S.drop_mix.length)
+        d.appendChild(card('Where they dropped',hbar(S.drop_mix),'angad.calls.drop_stage'));
+      return d;}],
+    ['What they talked about',()=>{
+      if(!S.talked_about) return el('div','nacard',
+        'No intent rows for these calls — the intelligence collection covers only part of the corpus. NA, not zero.');
+      const t=S.talked_about,d=el('div');
+      d.appendChild(el('div','note','Scored on <b>'+t.n.toLocaleString()+
+        '</b> of these calls · source: '+esc(t.src)));
+      const g=el('div','grid2');
+      if(t.caller_intent.length) g.appendChild(card('Caller intent',hbar(t.caller_intent)));
+      if(t.sentiment.length) g.appendChild(card('Customer sentiment (frustration signal)',
+        hbar(t.sentiment),'negative / very_negative = frustrated'));
+      d.appendChild(g);
+      if(t.objections.length) d.appendChild(card('Objections raised',hbar(t.objections)));
+      if(t.summaries.length){
+        d.appendChild(el('h3',null,'What actually happened on these calls'));
+        t.summaries.forEach(x=>d.appendChild(el('div','cap','• '+esc(x))));
+      }
+      return d;}],
+    ['The leads',()=>{const d=el('div');
+      d.appendChild(tableEl(S.leads_tbl));
+      d.appendChild(el('div','cap','Click any MLID to open the lead → its Conversation tab shows the turn-by-turn transcript.'));
+      return d;}],
+    ['Every call',()=>tableEl(S.calls_tbl)],
+  ];
+  const tb=document.getElementById('lmTabs');
+  tabs.forEach(([n,fn],i)=>{
+    const b=el('button',null,esc(n)); if(!i) b.classList.add('on');
+    b.onclick=()=>{ tb.querySelectorAll('button').forEach(x=>x.classList.remove('on'));
+      b.classList.add('on'); body.innerHTML=''; body.appendChild(fn()); };
+    tb.appendChild(b);
+  });
+  body.innerHTML=''; body.appendChild(tabs[0][1]());
+}
+
+/* ============ DAILY REPORT (RAMA-3) ============
+   The Growth-Reports table: Date · Week · Project × stage. Every count cell is
+   a link to the exact lead rows behind it (Total Count · search · Download),
+   which is their interaction, not one we invented. */
+let RPT_SRC='zoho';
+function renderDailyReport(){
+  const s=document.getElementById('s-daily'); if(!s) return;
+  s.innerHTML='';
+  const R=D.daily_report;
+  if(!R||R.error){
+    s.appendChild(el('div','nacard',esc((R&&R.error)||
+      'The Daily Report needs the Zoho lead cache — run a sync.')));
+    return;
+  }
+  const T=R[RPT_SRC]||R.zoho;
+  s.appendChild(el('h2',null,'Daily Leads Report'));
+
+  // stage-system toggle: the two systems disagree on half the leads, so the
+  // report states which one it is reading instead of quietly picking a winner
+  const tools=el('div','tools');
+  tools.appendChild(el('span','cap','Stage system:'));
+  [['zoho','Zoho / Inncircles'],['angad','ANGAD relay']].forEach(([k,lbl])=>{
+    const bt=el('button',RPT_SRC===k?'on':null,esc(lbl));
+    bt.onclick=()=>{ RPT_SRC=k; renderDailyReport(); };
+    tools.appendChild(bt);
+  });
+  s.appendChild(tools);
+
+  if(!T.rows||!T.rows.length){
+    s.appendChild(el('div','nacard','No leads were born inside this window.'));
+    return;
+  }
+  const nfmt=n=>Number(n||0).toLocaleString();
+  const summary=[
+    {label:'Leads born',value:nfmt(T.leads),sub:'person × project rows'},
+    {label:'Days',value:nfmt(new Set(T.rows.map(r=>r[0])).size)},
+    {label:'Projects',value:nfmt(T.projects)},
+    {label:'Stage disagreements',value:nfmt(T.disagree),
+     sub:'Zoho and ANGAD name different stages'},
+  ];
+  // KPIs first (contract: KPIs top-left), then the explanation beneath them
+  s.appendChild(kpiRow(summary));
+  s.appendChild(el('div','note',esc(T.note||'')));
+
+  const wrap=el('div','tblwrap');
+  const head='<tr>'+T.cols.map(c=>`<th>${esc(c)}</th>`).join('')+'</tr>';
+  const body=T.rows.map((r,ri)=>'<tr>'+r.map((v,i)=>
+    `<td class="${i>=3?'num':''}${i>=3&&v?' cell':''}" data-r="${ri}" data-c="${i}">${num(v)}</td>`
+  ).join('')+'</tr>').join('');
+  const foot=T.totals?'<tr class="totrow">'+T.totals.map((v,i)=>
+    `<td class="${i>=3?'num':''}">${num(v)}</td>`).join('')+'</tr>':'';
+  wrap.innerHTML='<table><thead>'+head+'</thead><tbody>'+body+'</tbody><tfoot>'+foot+'</tfoot></table>';
+  // every count cell resolves to its constituents (drill contract R3.1)
+  wrap.querySelectorAll('td.cell').forEach(td=>{
+    td.title='Open the leads behind this number';
+    td.onclick=()=>{
+      const r=T.rows[+td.dataset.r], ci=+td.dataset.c;
+      const colName=T.cols[ci];
+      openReportCell(r[0], r[2], colName, td.textContent.trim());
+    };
+  });
+  s.appendChild(wrap);
+  s.appendChild(el('div','cap',
+    'Window '+esc(T.window)+' · reading '+esc(T.stage_label)+
+    ' · ⚠ disagree = leads where the two stage systems name different stages.'));
+}
+
+async function openReportCell(day, project, colName, shown){
+  const ov=document.getElementById('lmOverlay'); ov.classList.add('open');
+  document.getElementById('lmTitle').textContent=
+    colName+' — '+project+' — '+day;
+  document.getElementById('lmSub').textContent='loading the leads behind this cell…';
+  ['lmHead','lmTabs','lmBody'].forEach(x=>document.getElementById(x).innerHTML='');
+  const q=currentQuery();
+  q.date=day; q.project=project; q.sstage=RPT_SRC;
+  q.stage=(colName==='Total'||colName==='⚠ disagree')?'':colName;
+  let R;
+  try{ R=await (await fetch('/api/report?'+new URLSearchParams(q))).json(); }
+  catch(e){ document.getElementById('lmSub').textContent='server unreachable'; return; }
+  const body=document.getElementById('lmBody');
+  if(R.error){ document.getElementById('lmSub').textContent='';
+    body.innerHTML='<div class="nacard">'+esc(R.error)+'</div>'; return; }
+  const parity=String(R.count)===String(shown).replace(/[^0-9]/g,'');
+  document.getElementById('lmSub').innerHTML=
+    '<b>Total Count '+R.count.toLocaleString()+'</b> · cell shows <b>'+esc(shown)+
+    '</b> — '+(parity
+      ? '<span style="color:#0a8a0a">MATCH ✓</span>'
+      : '<span style="color:#e34948">MISMATCH — please report via Feedback</span>')+
+    ' · reading '+esc(R.cell.src);
+  body.appendChild(el('div','note',esc(R.note)));
+  body.appendChild(tableEl(R.tbl));
+}
+
+/* ============ LEADS BOARD (RAMA-7) ============
+   One row per lead with the Inncircles Lead-Logs column set and their filter
+   dimensions: Zoho stage, ANGAD stage, NEW vs FOLLOW-UP, contacted, last
+   outcome, attempt band, WhatsApp reply. Loads on its own endpoint so the
+   board's filters never disturb the global call-level filters. */
+const LB={};                                  // current board filter state
+let LB_LOADED=false;
+function initLeadsBoard(){
+  const s=document.getElementById('s-leadsboard');
+  if(s.dataset.built) return; s.dataset.built='1';
+  s.appendChild(el('h2',null,'Leads board'));
+  s.appendChild(el('div','note','One row per lead (person × project) — the same grain '+
+    'the Inncircles Lead Logs board uses. Filters here are the board’s own and are '+
+    'independent of the global call filters above.'));
+  s.appendChild(el('div','tools')).id='lbTools';
+  s.appendChild(el('div')).id='lbSummary';
+  s.appendChild(el('div')).id='lbOut';
+  loadLeadsBoard();
+}
+
+const LB_FIELDS=[['lb_calltype','Call type'],['lb_contacted','Contacted'],
+                 ['lb_stage','Stage (Zoho)'],['lb_prdstage','Stage (ANGAD)'],
+                 ['lb_project','Project'],['lb_outcome','Last outcome'],
+                 ['lb_attempts','Attempts'],['lb_source','Source'],
+                 ['lb_wa','WA replied']];
+
+async function loadLeadsBoard(){
+  const out=document.getElementById('lbOut');
+  if(!out) return;
+  out.innerHTML='<div class="cap">loading the board…</div>';
+  const q={t:TOKEN};
+  Object.entries(LB).forEach(([k,v])=>{ if(v&&v.length) q[k]=v.join('|'); });
+  const srch=document.getElementById('lbSearch');
+  if(srch&&srch.value.trim()) q.lb_search=srch.value.trim();
+  let R;
+  try{ R=await (await fetch('/api/board?'+new URLSearchParams(q))).json(); }
+  catch(e){ out.innerHTML='<div class="cap">could not reach the local server</div>'; return; }
+  if(!R||R.error){ out.innerHTML='<div class="nacard">'+esc((R&&R.error)||'no data')+'</div>'; return; }
+
+  // filter row (built once, from the board's own option lists)
+  const tools=document.getElementById('lbTools');
+  if(!tools.dataset.built){
+    tools.dataset.built='1';
+    const inp=el('input'); inp.id='lbSearch';
+    inp.placeholder='Search MLID / Lead ID / Source Lead ID / project…';
+    inp.style.minWidth='300px';
+    inp.onkeydown=e=>{ if(e.key==='Enter') loadLeadsBoard(); };
+    tools.appendChild(inp);
+    LB_FIELDS.forEach(([key,label])=>{
+      const vals=(R.options||{})[key]||[];
+      if(!vals.length) return;
+      const sel=document.createElement('select');
+      sel.multiple=false; sel.title=label;
+      sel.innerHTML='<option value="">'+esc(label)+': all</option>'+
+        vals.map(v=>'<option value="'+esc(v)+'">'+esc(v)+'</option>').join('');
+      sel.onchange=()=>{ LB[key]=sel.value?[sel.value]:[]; loadLeadsBoard(); };
+      tools.appendChild(sel);
+    });
+    const clr=el('button',null,'Clear board filters');
+    clr.onclick=()=>{ Object.keys(LB).forEach(k=>delete LB[k]);
+      tools.querySelectorAll('select').forEach(x=>x.value='');
+      const i=document.getElementById('lbSearch'); if(i) i.value='';
+      loadLeadsBoard(); };
+    tools.appendChild(clr);
+  }
+  const sum=document.getElementById('lbSummary');
+  sum.innerHTML=''; sum.appendChild(kpiRow(R.summary));
+  out.innerHTML='';
+  out.appendChild(el('div','note',esc(R.note)));
+  out.appendChild(tableEl(R.tbl));
+  out.appendChild(el('div','cap','Showing '+R.tbl.shown.toLocaleString()+' of '+
+    R.total.toLocaleString()+' matching leads. Download CSV exports what is shown.'));
+}
+
+/* ============ PROGRESSIVE DISCLOSURE ============
+   Measured load per tab: Positives 18 cards + 13 charts + 7 tables, Review 13
+   cards + 8 charts, Intent 13 cards + 13 charts. Working memory holds ~4
+   chunks, so a wall of 18 peers forces the reader to build the grouping
+   themselves — that is extraneous load spent on layout instead of on the data.
+   Rather than rewrite twenty builders, everything past the first few cards in a
+   heavy section is folded behind one control. Nothing is removed and nothing is
+   hidden silently: the control states exactly how many are folded, and one
+   click restores the old view for anyone who wants the wall. */
+const DISCLOSE_AFTER=6;
+function discloseHeavySections(){
+  document.querySelectorAll('section').forEach(sec=>{
+    if(sec.dataset.disclosed) return;
+    // Cards are usually nested inside .grid2/.grid3 wrappers, so counting only
+    // direct children found zero and the fold never fired. Walk the direct
+    // children but count the cards INSIDE each one, and cut at the child where
+    // the running total passes the threshold — that keeps a grid row intact
+    // instead of splitting it down the middle.
+    const kids=[...sec.children];
+    const total=sec.querySelectorAll('.card').length;
+    if(total<=DISCLOSE_AFTER) return;
+    let seen=0, cut=-1;
+    for(let i=0;i<kids.length;i++){
+      const n=kids[i].classList&&kids[i].classList.contains('card')
+        ? 1 : kids[i].querySelectorAll?kids[i].querySelectorAll('.card').length:0;
+      if(seen>=DISCLOSE_AFTER && n>0){ cut=i; break; }
+      seen+=n;
+    }
+    if(cut<0) return;
+    sec.dataset.disclosed='1';
+    const rest=kids.slice(cut);
+    const hidden=rest.reduce((a,n)=>a+((n.classList&&n.classList.contains('card'))?1:
+      (n.querySelectorAll?n.querySelectorAll('.card').length:0)),0);
+    if(!hidden) return;
+    const box=el('div','folded');
+    rest.forEach(n=>box.appendChild(n));
+    const btn=el('button','discl','▾ Show '+hidden+' more cards in this section');
+    let open=false;
+    btn.onclick=()=>{ open=!open; box.classList.toggle('open',open);
+      btn.textContent=(open?'▴ Hide ':'▾ Show ')+hidden+
+        (open?' cards':' more cards in this section'); };
+    sec.appendChild(btn); sec.appendChild(box);
+  });
+}
+
+/* ============ STILL PENDING — everything left undone, counted live ======== */
+async function initPending(){
+  const s=document.getElementById('s-pending'); if(!s||s.dataset.built) return;
+  s.dataset.built='1';
+  s.appendChild(el('h2',null,'Still pending'));
+  s.appendChild(el('div')).id='pendOut';
+  loadPending();
+}
+async function loadPending(){
+  const out=document.getElementById('pendOut'); if(!out) return;
+  out.innerHTML='<div class="cap">counting…</div>';
+  let R; try{ R=await (await fetch('/api/pending?t='+TOKEN)).json(); }
+  catch(e){ out.innerHTML='<div class="cap">server unreachable</div>'; return; }
+  if(!R||!R.items){ out.innerHTML='<div class="nacard">nothing to report</div>'; return; }
+  out.innerHTML='';
+  out.appendChild(el('div','note',esc(R.note)));
+  R.items.forEach(it=>{
+    const cd=el('div','card pend-'+esc(it.severity));
+    const head=el('div','pendhead');
+    head.appendChild(el('span','pendarea',esc(it.area)));
+    head.appendChild(el('span','pendn',it.count==null?'—':Number(it.count).toLocaleString()));
+    cd.appendChild(head);
+    cd.appendChild(el('h3',null,esc(it.what)));
+    cd.appendChild(el('div','cap',esc(it.detail)));
+    if(it.tab){
+      const b=el('button',null,'Open the rows →');
+      b.onclick=()=>gotoTab(it.tab);
+      cd.appendChild(b);
+    }
+    out.appendChild(cd);
+  });
+}
+
+/* ============ DATABASE HEALTH ============ */
+async function initDbHealth(){
+  const s=document.getElementById('s-dbhealth'); if(!s||s.dataset.built) return;
+  s.dataset.built='1';
+  s.appendChild(el('h2',null,'Database health'));
+  s.appendChild(el('div')).id='dbhOut';
+  loadDbHealth();
+}
+async function loadDbHealth(){
+  const out=document.getElementById('dbhOut'); if(!out) return;
+  out.innerHTML='<div class="cap">reading every collection…</div>';
+  let R; try{ R=await (await fetch('/api/dbhealth?t='+TOKEN)).json(); }
+  catch(e){ out.innerHTML='<div class="cap">server unreachable</div>'; return; }
+  if(!R||R.error){ out.innerHTML='<div class="nacard">no cache</div>'; return; }
+  out.innerHTML='';
+  out.appendChild(kpiRow(R.kpis));
+  out.appendChild(el('div','note warn',esc(R.note)));
+  out.appendChild(el('h2',null,'Key fields we depend on'));
+  out.appendChild(tableEl(R.fields));
+  out.appendChild(el('div','cap','ALL NULL or COLUMN ABSENT here means a number '+
+    'somewhere on this dashboard is resting on nothing. That is the row to act on.'));
+  out.appendChild(el('h2',null,'Every collection'));
+  out.appendChild(tableEl(R.tbl));
+}
+
+/* ============ DAY BY DAY — bot call performance, overlayable ============ */
+const DBD_ON=new Set(['pickup_pct','median_turns']);
+async function initDayByDay(){
+  const s=document.getElementById('s-daybyday'); if(!s||s.dataset.built) return;
+  s.dataset.built='1';
+  s.appendChild(el('h2',null,'Day by day — bot call performance'));
+  s.appendChild(el('div','tools')).id='dbdTools';
+  s.appendChild(el('div')).id='dbdOut';
+  loadDayByDay();
+}
+async function loadDayByDay(){
+  const out=document.getElementById('dbdOut'); if(!out) return;
+  out.innerHTML='<div class="cap">loading…</div>';
+  const q=currentQuery();
+  let R; try{ R=await (await fetch('/api/daybyday?'+new URLSearchParams(q))).json(); }
+  catch(e){ out.innerHTML='<div class="cap">server unreachable</div>'; return; }
+  if(!R||R.error||!R.dates){ out.innerHTML='<div class="nacard">no calls in this window</div>'; return; }
+  const tools=document.getElementById('dbdTools');
+  tools.innerHTML=''; tools.appendChild(el('span','cap','Overlay:'));
+  R.series.forEach(sr=>{
+    const b=el('button',DBD_ON.has(sr.key)?'on':null,esc(sr.name));
+    b.onclick=()=>{ DBD_ON.has(sr.key)?DBD_ON.delete(sr.key):DBD_ON.add(sr.key);
+      b.classList.toggle('on'); loadDayByDay(); };
+    tools.appendChild(b);
+  });
+  out.innerHTML='';
+  out.appendChild(el('div','note',esc(R.note)));
+  // volume first (counts), then the overlay (rates + per-call counts)
+  out.appendChild(card('Dials · picked up · not picked up',
+    vline(R.dates,[
+      {name:'dials',color:'var(--c5)',values:R.volume.dials},
+      {name:'picked up',color:'var(--c2)',values:R.volume.picked_up},
+      {name:'not picked up',color:'var(--c6)',values:R.volume.not_picked}],
+      {h:260}),
+    'Counts. A tall day is a busy day, not a good day — read it beside the overlay below.'));
+  const on=R.series.filter(sr=>DBD_ON.has(sr.key));
+  if(on.length){
+    out.appendChild(card('Overlay — tick series above to compare',
+      vline(R.dates,on.map(sr=>({name:sr.name,color:sr.color,
+        values:sr.values.map(v=>v==null?0:v)})),{h:280}),
+      'Rates and per-call counts only, so days of different volume are comparable. '+
+      'Gaps are days with no qualifying call, drawn as 0.'));
+  } else {
+    out.appendChild(el('div','nacard','No series selected — tick one above.'));
+  }
+  out.appendChild(el('h2',null,'Every day, every number'));
+  out.appendChild(tableEl(R.tbl));
+}
+
+/* ============ BY PROJECT ============ */
+async function initProjects(){
+  const s=document.getElementById('s-projects'); if(!s||s.dataset.built) return;
+  s.dataset.built='1';
+  s.appendChild(el('h2',null,'By project — what came in, what got called, what happened'));
+  s.appendChild(el('div')).id='prjOut';
+  loadProjects();
+}
+async function loadProjects(){
+  const out=document.getElementById('prjOut'); if(!out) return;
+  out.innerHTML='<div class="cap">loading…</div>';
+  let R; try{ R=await (await fetch('/api/projects?'+new URLSearchParams(currentQuery()))).json(); }
+  catch(e){ out.innerHTML='<div class="cap">server unreachable</div>'; return; }
+  if(!R||R.error||!R.rows){ out.innerHTML='<div class="nacard">no project data</div>'; return; }
+  out.innerHTML='';
+  out.appendChild(el('div','note',esc(R.note)));
+  const wrap=el('div','tblwrap');
+  wrap.innerHTML='<table><thead><tr>'+R.cols.map(c=>'<th>'+esc(c)+'</th>').join('')+
+    '</tr></thead><tbody>'+R.rows.map((r,ri)=>'<tr>'+r.map((v,i)=>
+      '<td class="'+(i?'num':'')+(i&&v?' cell':'')+'" data-r="'+ri+'" data-c="'+i+'">'+
+      (v==null?'—':num(v))+'</td>').join('')+'</tr>').join('')+
+    '</tbody><tfoot><tr class="totrow">'+(R.totals||[]).map((v,i)=>
+      '<td class="'+(i?'num':'')+'">'+(v==null?'—':num(v))+'</td>').join('')+
+    '</tr></tfoot></table>';
+  // every cell resolves to the leads behind it
+  wrap.querySelectorAll('td.cell').forEach(td=>{
+    td.title='Open the leads behind this number';
+    td.onclick=()=>{
+      const r=R.rows[+td.dataset.r], colName=R.cols[+td.dataset.c];
+      openSlice('project', r[0]+' — '+colName, td.textContent.trim());
+    };
+  });
+  out.appendChild(wrap);
+  out.appendChild(el('div','cap','Click any number to open the leads behind it · '+
+    'Download CSV from the drill box carries the filter state.'));
+}
+
+/* ============ ATTENDANCE — the goal's sensor ============ */
+async function initAttend(){
+  const s=document.getElementById('s-attend'); if(!s||s.dataset.built) return;
+  s.dataset.built='1';
+  s.appendChild(el('h2',null,'Attendance — the goal’s sensor'));
+  s.appendChild(el('div')).id='attOut';
+  loadAttend();
+}
+async function loadAttend(extra){
+  const out=document.getElementById('attOut'); if(!out) return;
+  out.innerHTML='<div class="cap">loading…</div>';
+  const q=Object.assign({t:TOKEN},extra||{});
+  let R; try{ R=await (await fetch('/api/attendance?'+new URLSearchParams(q))).json(); }
+  catch(e){ out.innerHTML='<div class="cap">server unreachable</div>'; return; }
+  if(!R||R.error){ out.innerHTML='<div class="nacard">'+esc((R&&R.error)||'no bookings')+'</div>'; return; }
+  out.innerHTML='';
+  out.appendChild(kpiRow(R.kpis));
+  out.appendChild(el('div','note warn',esc(R.note)));
+  if(R.mix&&R.mix.length) out.appendChild(card('Attendance verdicts',hbar(R.mix)));
+  const bar=el('div','tools');
+  const key=el('input'); key.placeholder='Booking key (copy from the table)…'; key.style.minWidth='260px';
+  const sel=document.createElement('select');
+  sel.innerHTML=R.states.map(s2=>'<option value="'+esc(s2)+'">'+esc(s2)+'</option>').join('');
+  const note=el('input'); note.placeholder='Note (no customer names)'; note.style.minWidth='220px';
+  const go=el('button',null,'Record verdict');
+  go.onclick=()=>{ if(!key.value.trim()) return;
+    loadAttend({key:key.value.trim(),state:sel.value,note:note.value,who:'ops'});
+    key.value=''; note.value=''; };
+  bar.appendChild(key); bar.appendChild(sel); bar.appendChild(note); bar.appendChild(go);
+  out.appendChild(bar);
+  out.appendChild(tableEl(R.tbl));
+}
+
+/* ============ QA & TO-DO (RAMA-8) ============ */
+let QA_CAT='Conversation quality';
+function initQA(){
+  const s=document.getElementById('s-qa');
+  if(s.dataset.built) return; s.dataset.built='1';
+  s.appendChild(el('h2',null,'QA queue & to-do'));
+  s.appendChild(el('div','tools')).id='qaTools';
+  s.appendChild(el('div')).id='qaOut';
+  s.appendChild(el('h2',null,'Documents asked for — and whether they went out')).id='docsH';
+  s.appendChild(el('div')).id='docsOut';
+  s.appendChild(el('h2',null,'To-do list'));
+  s.appendChild(el('div','note','Append-only local journal (RELEASES/todo.jsonl). '+
+    'Nothing is written to any database. <b>Do not type customer names into a note.</b> '+
+    'Phone numbers and emails are stripped automatically, and so is a name in a '+
+    'greeting slot ("Hi, Priya") — but a name written freely ("call Priya back") '+
+    'CANNOT be detected reliably, and imprint ② says names are never cached. '+
+    'Use the MLID or Lead ID instead; every row here links to the lead.'));
+  s.appendChild(el('div')).id='todoOut';
+  loadQA(); loadDocs();
+}
+function addTodo(kind,ref,text,cat){
+  const q=new URLSearchParams({t:TOKEN,kind,ref:ref||'',text,cat:cat||''});
+  fetch('/api/todo?'+q).then(r=>r.json()).then(R=>renderTodo(R.todo||[]));
+}
+function renderTodo(list){
+  const host=document.getElementById('todoOut'); if(!host) return;
+  host.innerHTML='';
+  if(!list.length){ host.appendChild(el('div','cap','Nothing on the list yet.')); return; }
+  const w=el('div','tblwrap');
+  w.innerHTML='<table><thead><tr><th>Added</th><th>Kind</th><th>Ref</th><th>Note</th></tr></thead><tbody>'+
+    list.map(x=>'<tr><td>'+esc(String(x.at||'').replace('T',' ').slice(0,16))+'</td><td>'+
+      esc(x.kind||'')+'</td><td>'+esc(x.ref||'')+'</td><td style="white-space:normal">'+
+      esc(x.text||'')+'</td></tr>').join('')+'</tbody></table>';
+  host.appendChild(w);
+}
+async function loadQA(){
+  const out=document.getElementById('qaOut'); out.innerHTML='<div class="cap">loading…</div>';
+  let R;
+  try{ R=await (await fetch('/api/qa?'+new URLSearchParams({t:TOKEN,qa_cat:QA_CAT}))).json(); }
+  catch(e){ out.innerHTML='<div class="cap">server unreachable</div>'; return; }
+  if(!R||R.error){ out.innerHTML='<div class="nacard">'+esc((R&&R.error)||'no CIF scores yet')+'</div>'; return; }
+  const tools=document.getElementById('qaTools');
+  if(!tools.dataset.built){
+    tools.dataset.built='1';
+    tools.appendChild(el('span','cap','QA by CIF category:'));
+    (R.cats||[]).forEach(cName=>{
+      const b=el('button',cName===QA_CAT?'on':null,esc(cName));
+      b.onclick=()=>{ QA_CAT=cName;
+        tools.querySelectorAll('button').forEach(x=>x.classList.remove('on'));
+        b.classList.add('on'); loadQA(); };
+      tools.appendChild(b);
+    });
+  }
+  out.innerHTML='';
+  if(R.empty){ out.appendChild(el('div','nacard',esc(R.note))); return; }
+  out.appendChild(el('div','note',esc(R.note)));
+  out.appendChild(tableEl(R.tbl));
+  const bar=el('div','tools');
+  const inp=el('input'); inp.id='qaVerdict'; inp.placeholder='QA verdict for the selected call…';
+  inp.style.minWidth='320px';
+  const add=el('button',null,'Log verdict to to-do');
+  add.onclick=()=>{ const v=inp.value.trim(); if(!v) return;
+    addTodo('qa', QA_CAT, v, QA_CAT); inp.value=''; };
+  bar.appendChild(inp); bar.appendChild(add);
+  out.appendChild(bar);
+  renderTodo(R.todo||[]);
+}
+async function loadDocs(){
+  const out=document.getElementById('docsOut'); out.innerHTML='<div class="cap">loading…</div>';
+  let R;
+  try{ R=await (await fetch('/api/docs?t='+TOKEN)).json(); }
+  catch(e){ out.innerHTML='<div class="cap">server unreachable</div>'; return; }
+  if(!R||R.error){ out.innerHTML='<div class="nacard">no document log</div>'; return; }
+  out.innerHTML='';
+  out.appendChild(kpiRow([
+    {label:'Document requests',value:Number(R.requests_n||0).toLocaleString()},
+    {label:'Blocked / not sent',value:Number(R.blocked_n||0).toLocaleString(),
+     sub:'the bot gave a reason'},
+    {label:'Documents in the library',value:Number(R.library_n||0).toLocaleString()},
+  ]));
+  out.appendChild(el('div','note',esc(R.note)));
+  if(R.mix&&R.mix.length) out.appendChild(card('What gets asked for',hbar(R.mix)));
+  if(R.requests) out.appendChild(tableEl(R.requests));
+  const bar=el('div','tools');
+  const inp=el('input'); inp.placeholder='Add a document/price-sheet task…';
+  inp.style.minWidth='320px';
+  const add=el('button',null,'Add to to-do');
+  add.onclick=()=>{ const v=inp.value.trim(); if(!v) return;
+    addTodo('doc','',v,''); inp.value=''; };
+  bar.appendChild(inp); bar.appendChild(add);
+  out.appendChild(bar);
+  if(R.library){ out.appendChild(el('h3',null,'Document library'));
+    out.appendChild(tableEl(R.library)); }
+  renderTodo(R.todo||[]);
+}
+
+/* ============ BUILDER METRICS (RAMA-9) ============ */
+function initBuilder(){
+  const s=document.getElementById('s-builder');
+  if(s.dataset.built) return; s.dataset.built='1';
+  s.appendChild(el('h2',null,'Builder / production metrics'));
+  s.appendChild(el('div')).id='blOut';
+  loadBuilder();
+}
+async function loadBuilder(){
+  const out=document.getElementById('blOut'); out.innerHTML='<div class="cap">analysing turns…</div>';
+  let R;
+  try{ R=await (await fetch('/api/builder?t='+TOKEN)).json(); }
+  catch(e){ out.innerHTML='<div class="cap">server unreachable</div>'; return; }
+  if(!R||R.error||!R.per_turn){ out.innerHTML='<div class="nacard">no transcript corpus</div>'; return; }
+  out.innerHTML='';
+  const w=R.worst_drop;
+  out.appendChild(kpiRow([
+    {label:'Transcripts analysed',value:Number(R.corpus_n||0).toLocaleString()},
+    {label:'Biggest single drop',value:w?(w.pct+'%'):'—',
+     sub:w?('turn '+w.from+' → '+w.to+' · '+w.lost.toLocaleString()+' calls lost'):''},
+    {label:'Bot versions seen',value:String((R.versions||[]).length),
+     sub:(R.versions||[]).map(v=>v.persona).join(' · ')},
+  ]));
+  out.appendChild(el('div','note',esc(R.note)));
+
+  // survival curve + words per turn
+  const labels=R.per_turn.map(t=>'T'+t.turn);
+  out.appendChild(card('Calls still alive at each turn (survival)',
+    vline(labels,[{name:'calls alive',color:'var(--c1)',
+                   values:R.per_turn.map(t=>t.calls_alive)}],{h:230,unit:' calls'}),
+    'Turn 1 is the agent’s opening and the reply to it. This is a survival curve — '+
+    'later turns describe the calls that SURVIVED, not a like-for-like sample.'));
+  out.appendChild(card('Words per turn — agent vs customer',
+    vline(labels,[{name:'agent words',color:'var(--c1)',
+                   values:R.per_turn.map(t=>t.agent_words||0)},
+                  {name:'customer words',color:'var(--c2)',
+                   values:R.per_turn.map(t=>t.customer_words||0)}],{h:230,unit:' w'}),
+    'The gap between the two lines IS the monologue problem, per turn.'));
+
+  const t=el('div','tblwrap');
+  t.innerHTML='<table><thead><tr><th>Turn</th><th>Calls alive</th><th>Survival %</th>'+
+    '<th>Agent words</th><th>Customer words</th><th>Customer replied %</th></tr></thead><tbody>'+
+    R.per_turn.map(x=>'<tr><td>'+x.turn+'</td><td class="num">'+x.calls_alive.toLocaleString()+
+      '</td><td class="num">'+x.survival_pct+'</td><td class="num">'+(x.agent_words??'—')+
+      '</td><td class="num">'+(x.customer_words??'—')+'</td><td class="num">'+
+      x.customer_replied_pct+'</td></tr>').join('')+'</tbody></table>';
+  out.appendChild(el('h2',null,'Per-turn detail'));
+  out.appendChild(t);
+
+  out.appendChild(el('h2',null,'Version diff — what each bot version does differently'));
+  const v=el('div','tblwrap');
+  v.innerHTML='<table><thead><tr><th>Version (name it gives itself)</th><th>Calls</th>'+
+    '<th>Median turns</th><th>Agent words/turn</th><th>Customer words/turn</th></tr></thead><tbody>'+
+    (R.versions||[]).map(x=>'<tr><td><b>'+esc(x.persona)+'</b></td><td class="num">'+
+      x.calls.toLocaleString()+'</td><td class="num">'+(x.median_turns??'—')+
+      '</td><td class="num">'+(x.agent_words_per_turn??'—')+'</td><td class="num">'+
+      (x.customer_words_per_turn??'—')+'</td></tr>').join('')+'</tbody></table>';
+  out.appendChild(v);
+  (R.versions||[]).forEach(x=>{
+    if(!x.openings||!x.openings.length) return;
+    out.appendChild(el('h3',null,'How '+esc(x.persona)+' opens'));
+    x.openings.forEach(o=>out.appendChild(el('div','cap','• '+esc(o))));
+  });
+  out.appendChild(el('div','cap','Counts differ by orders of magnitude — Radhika dominates '+
+    'the corpus and the newer versions have only a handful of transcripts each. Treat the '+
+    'newer rows as directional, not as a measured comparison.'));
+}
+
+/* "Explain this number" (contract rule 5) */
+function explain(label){
+  // Every card answers. A hand-written contract wins; otherwise the contract
+  // derived from the card's own sub-label and source is shown, clearly marked
+  // PARTIAL. "NO DEFINITION EXPOSED" is now reserved for a label that does not
+  // exist at all, which is a bug rather than a gap.
+  const L=(D&&D.lineage&&D.lineage[label])||
+          (D&&D.card_contracts&&D.card_contracts[label])||null;
+  const ov=document.getElementById('lmOverlay'); ov.classList.add('open');
+  document.getElementById('lmTitle').textContent='ⓘ '+label;
+  const partial=L&&L.contract==='PARTIAL';
+  document.getElementById('lmSub').textContent = !L
+    ? 'no card with this label is currently on the page'
+    : (partial ? 'PARTIAL contract — source known, constituents not yet verified'
+               : 'FULL contract — verified definition behind this number');
+  document.getElementById('lmHead').innerHTML='';
+  document.getElementById('lmTabs').innerHTML='';
+  const b=document.getElementById('lmBody');
+  if(!L){ b.innerHTML='<div class="nacard">No card with this label is on the page right now.</div>'; return; }
+  const cov=(D&&D.contract_coverage)||{};
+  b.innerHTML=
+    (partial?'<div class="note warn"><b>PARTIAL contract.</b> This card states a '+
+      'value and a source, but its constituents have not been written down and '+
+      'verified against a query. Treat the number as directional until they are.'+
+      (cov.total?' Across the dashboard: <b>'+cov.full+'</b> of <b>'+cov.total+
+      '</b> cards are fully contracted ('+cov.pct_full+'%).':'')+'</div>':'')+
+    '<div class="card"><h3>Definition</h3>'+esc(L.def)+'</div>'+
+    '<div class="grid2" style="margin-top:12px">'+
+    '<div class="card"><h3>Numerator</h3>'+esc(L.num||'—')+'</div>'+
+    '<div class="card"><h3>Denominator</h3>'+esc(L.den||'— (a count, not a rate)')+'</div>'+
+    '<div class="card"><h3>Time window</h3>'+esc(L.window)+'</div>'+
+    '<div class="card"><h3>Filter scope</h3>'+esc(L.filters)+'</div>'+
+    '</div>'+
+    '<div class="card" style="margin-top:12px"><h3>Source collection</h3>'+esc(L.src)+'</div>'+
+    (L.excl?'<div class="note warn"><b>Excluded / contaminated:</b> '+esc(L.excl)+'</div>':'');
+}
+function grid(n,...kids){
+  const d=el('div','grid'+n); kids.forEach(k=>d.appendChild(k)); return d;
+}
+
+/* ---------------- filters ---------------- */
+const FILTERS=[
+  ['from','From','date'],['to','To','date'],
+  ['born_from','Born from','date'],['born_to','Born to','date'],
+  ['outcome_group','Outcome group','multi'],
+  ['outcome','Outcome','multi'],
+  ['status','Dial status','multi'],
+  ['project','Project','multi'],
+  ['stage','CRM stage','multi'],
+  ['drop_stage','Drop stage','multi'],
+  ['duration','Call length','multi'],
+  ['attempts','Attempts on lead','multi'],
+  ['audience','NRI / RI','multi'],
+  ['hour','Hour of day','multi'],
+  ['weekday','Weekday','multi'],
+  ['direction','Direction','multi'],
+  ['slug','Prompt','multi'],
+  ['language','Language','multi'],
+  ['era','Era','multi'],
+  ['engine','Voice engine','multi'],
+  ['source','Source','multi'],
+  ['has_transcript','Transcript','multi'],
+  ['quality','Transcript quality','multi'],
+  ['qualified','Qualified','multi'],
+  ['broker','Broker','multi'],
+  ['whatsapp','WhatsApp','multi'],
+  ['search','Search transcripts','text'],
+];
+const SEL={};
+
+function multiselect(key,label,values){
+  const wrap=el('div','f'); wrap.appendChild(el('label',null,esc(label)));
+  const ms=el('div','ms');
+  const btn=el('button','ms-btn'); btn.type='button';
+  const pop=el('div','ms-pop');
+  const search=el('input','ms-search'); search.placeholder='Search\u2026';
+  const list=el('div','ms-list');
+  if(!SEL[key]) SEL[key]=new Set();
+
+  function paint(){
+    const sel=SEL[key];
+    btn.innerHTML='';
+    const shown = sel.size ? [...sel].slice(0,2).map(esc).join(', ')+(sel.size>2?' +'+(sel.size-2):'') : 'All';
+    btn.appendChild(el('span','v',shown));
+    if(sel.size) btn.appendChild(el('span','cnt',String(sel.size)));
+    btn.classList.toggle('active', sel.size>0);
+  }
+  function draw(q){
+    q=(q||'').toLowerCase(); list.innerHTML='';
+    const hits=values.filter(v=>!q||String(v).toLowerCase().includes(q));
+    // Every option shows how many rows it would match IN THE CURRENT WINDOW.
+    // Without this, picking a value that exists in the dataset but not in the
+    // window (era=Kaalbhojaditya inside a July-August range) empties the screen
+    // and reads as "the filter is broken". It never was — 22 of 22 filter
+    // correctly; the modal was just offering values the window cannot show.
+    // Gate semantics, stated where they apply (asked 2026-08-08):
+    //   WITHIN one filter  = OR   (isin — tick BUSY and NO_ANSWER, get both)
+    //   ACROSS filters     = AND  (each filter narrows what the last one left)
+    if(!list.dataset.gated){
+      list.dataset.gated='1';
+    }
+    const counts=(D&&D.option_counts&&D.option_counts[key])||null;
+    hits.forEach(v=>{
+      const row=el('label','ms-opt');
+      const cb=el('input'); cb.type='checkbox'; cb.checked=SEL[key].has(v);
+      cb.onchange=()=>{ cb.checked?SEL[key].add(v):SEL[key].delete(v); paint(); renderChips(); };
+      row.appendChild(cb); row.appendChild(document.createTextNode(v));
+      if(counts){
+        const n=counts[String(v)]||0;
+        const tag=el('span','optn',n?n.toLocaleString():'0 here');
+        if(!n){ row.classList.add('dead');
+          row.title='Nothing matches this inside the current date range — '+
+                    'widen the dates or clear them to use it'; }
+        row.appendChild(tag);
+      }
+      list.appendChild(row);
+    });
+    if(!hits.length) list.appendChild(el('div','cap','No matches'));
+  }
+  btn.onclick=e=>{
+    e.stopPropagation(); e.preventDefault();
+    const wasOpen=pop.classList.contains('open');
+    document.querySelectorAll('.ms-pop.open').forEach(x=>x.classList.remove('open'));
+    if(!wasOpen){ pop.classList.add('open'); draw(search.value); search.focus(); }
+  };
+  search.oninput=()=>draw(search.value);
+  pop.onclick=e=>e.stopPropagation();
+
+  const acts=el('div','ms-acts');
+  const all=el('button',null,'Select all');
+  all.onclick=e=>{e.stopPropagation();values.forEach(v=>SEL[key].add(v));draw(search.value);paint();renderChips();};
+  const none=el('button',null,'Clear');
+  none.onclick=e=>{e.stopPropagation();SEL[key].clear();draw(search.value);paint();renderChips();};
+  acts.appendChild(all); acts.appendChild(none);
+
+  pop.appendChild(search); pop.appendChild(list); pop.appendChild(acts);
+  ms.appendChild(btn); ms.appendChild(pop); wrap.appendChild(ms);
+  paint(); draw('');
+  return wrap;
+}
+
+function renderChips(){
+  const box=document.getElementById('chips'); if(!box) return;
+  const bits=[];
+  FILTERS.forEach(f=>{
+    const key=f[0], label=f[1], type=f[2];
+    if(type!=='multi') return;
+    (SEL[key]||new Set()).forEach(v=>{
+      bits.push('<span class="chip"><b>'+esc(label)+':</b>'+esc(v)+
+                '<span data-k="'+esc(key)+'" data-v="'+esc(v)+'">\u00d7</span></span>');
+    });
+  });
+  const txt=document.getElementById('f_search');
+  if(txt&&txt.value) bits.push('<span class="chip"><b>Search:</b>'+esc(txt.value)+
+                               '<span data-k="search" data-v="">\u00d7</span></span>');
+  // Gate semantics, stated on the chip row itself. Verified against
+  // apply_filters(): each filter narrows the frame the previous one left (AND),
+  // and inside one filter the values are an isin() (OR).
+  const GATE='<span class="cap" style="margin-left:auto">'+
+    'ticks inside one filter = <b>OR</b> \u00b7 different filters combine with <b>AND</b></span>';
+  box.innerHTML = bits.length ? (bits.join('')+GATE) :
+    '<span class="cap">No filters applied \u2014 showing everything in the date range. '+
+    'When you do filter: ticks inside one filter are <b>OR</b>, separate filters are <b>AND</b>.</span>';
+  // mirror into the collapsed hero so active filters are ALWAYS visible
+  const hero=document.getElementById('fhChips'), cnt=document.getElementById('fhCount');
+  if(hero){
+    hero.innerHTML = bits.length ? bits.join('') :
+      '<span class="cap">No filters \u2014 showing everything in the date range. Click \u2699 Filters to narrow.</span>';
+    hero.querySelectorAll('.chip span[data-k]').forEach(x=>{
+      x.onclick=()=>{ const k=x.dataset.k, v=x.dataset.v;
+        if(k==='search'){ const t=document.getElementById('f_search'); if(t)t.value=''; }
+        else if(SEL[k]) SEL[k].delete(v);
+        buildFilters(); renderChips(); load(); };
+    });
+  }
+  if(cnt){ cnt.textContent=bits.length; cnt.style.display=bits.length?'':'none'; }
+  box.querySelectorAll('.chip span[data-k]').forEach(x=>{
+    x.onclick=()=>{
+      const k=x.dataset.k;
+      if(k==='search'){ const t=document.getElementById('f_search'); if(t) t.value='';
+        localStorage.removeItem('f_searchval'); }
+      else if(SEL[k]) SEL[k].delete(x.dataset.v);
+      buildFilters(); load();
+    };
+  });
+}
+
+function buildFilters(){
+  // B9 fix: prune selections whose key or value no longer exists in OPT
+  const valid=new Set(FILTERS.filter(f=>f[2]==='multi').map(f=>f[0]));
+  Object.keys(SEL).forEach(k=>{
+    if(!valid.has(k)){ delete SEL[k]; return; }
+    const allowed=new Set((OPT[k]||[]).map(String));
+    [...SEL[k]].forEach(v=>{ if(!allowed.has(v)) SEL[k].delete(v); });
+  });
+  const box=document.getElementById('filters'); box.innerHTML='';
+  const row=el('div','frow'); box.appendChild(row);
+
+  FILTERS.forEach(f=>{
+    const key=f[0], label=f[1], type=f[2];
+    if(type==='multi'){
+      const vals=(OPT[key]||[]).map(String);
+      if(!vals.length) return;
+      row.appendChild(multiselect(key,label,vals));
+      return;
+    }
+    if(type==='date'){
+      // date inputs live permanently in the toolbar — never hidden in a panel
+      const d=document.getElementById('f_'+key);
+      if(d && !d.dataset.wired){
+        if(key==='from'||key==='to'){
+          d.value = key==='from' ? (localStorage.getItem('f_from')||OPT.date_min)
+                                 : (localStorage.getItem('f_to')||OPT.date_max);
+          d.min=OPT.date_min; d.max=OPT.date_max;
+        } else {
+          // born-date range: blank means "no born filter", and lead birth can
+          // predate the call window, so it is NOT clamped to the call range
+          d.value = localStorage.getItem('f_'+key)||'';
+        }
+        d.onchange=()=>{ if(key==='from'||key==='to') markPreset(null);
+          localStorage.setItem('f_'+key, d.value); load(); };
+        d.dataset.wired='1';
+      }
+      return;
+    }
+    const cell=el('div','f'); cell.appendChild(el('label',null,esc(label)));
+    const input=el('input'); input.id='f_'+key;
+    {
+      input.type='text'; input.placeholder='word or LEAD-ref';
+      input.value = localStorage.getItem('f_searchval')||'';
+      input.onkeydown=e=>{ if(e.key==='Enter'){ localStorage.setItem('f_searchval',input.value); renderChips(); load(); } };
+    }
+    cell.appendChild(input); row.appendChild(cell);
+  });
+
+  const chips=el('div','chips'); chips.id='chips'; box.appendChild(chips);
+
+  const bar=el('div','fbar');
+  const apply=el('button','primary','Apply filters');
+  apply.onclick=()=>{ document.getElementById('filterModal').classList.remove('open');
+    renderChips(); load(); };
+  const reset=el('button',null,'Clear filters');
+  reset.onclick=()=>{ Object.keys(SEL).forEach(k=>SEL[k].clear());
+    localStorage.removeItem('f_searchval');
+    buildFilters(); renderChips(); load(); };
+  bar.appendChild(apply); bar.appendChild(reset);
+  bar.appendChild(el('span','cap','Tick any number of values in each dropdown \u2014 filters combine.'));
+  box.appendChild(bar);
+  renderChips();
+}
+
+/* date presets, always visible in the toolbar (Inncircles pattern) */
+function markPreset(name){
+  document.querySelectorAll('#dpresets .dpreset').forEach(b=>
+    b.classList.toggle('on', b.textContent===name));
+}
+function buildPresets(){
+  const host=document.getElementById('dpresets');
+  if(!host || host.dataset.built) return;
+  host.dataset.built='1';
+  const maxD=OPT.date_max, minD=OPT.date_min;
+  const back=n=>{ const d=new Date(maxD); d.setDate(d.getDate()-n); return d.toISOString().slice(0,10); };
+  const monthStart=()=>{ const d=new Date(maxD); d.setDate(1); return d.toISOString().slice(0,10); };
+  const set=(from,to,label)=>{
+    document.getElementById('f_from').value=from;
+    document.getElementById('f_to').value=to;
+    markPreset(label); load();
+  };
+  [['Today',()=>set(maxD,maxD,'Today')],
+   ['Yesterday',()=>set(back(1),back(1),'Yesterday')],
+   ['Last 7 days',()=>set(back(6),maxD,'Last 7 days')],
+   ['Last 30 days',()=>set(back(29),maxD,'Last 30 days')],
+   ['This month',()=>set(monthStart(),maxD,'This month')],
+   ['ANGAD era',()=>set('2026-07-17',maxD,'ANGAD era')],
+   ['All time',()=>set(minD,maxD,'All time')],
+  ].forEach(([label,fn])=>{
+    const b=el('button','dpreset',label); b.onclick=fn; host.appendChild(b);
+  });
+}
+
+document.addEventListener('click',()=>{
+  document.querySelectorAll('.ms-pop.open').forEach(x=>x.classList.remove('open'));
+});
+
+function currentQuery(){
+  const q={t:TOKEN};
+  FILTERS.forEach(f=>{
+    const key=f[0], type=f[2];
+    if(type==='multi'){
+      const v=[...(SEL[key]||[])];
+      if(v.length) q[key]=v.join('|');
+    } else {
+      const e=document.getElementById('f_'+key);
+      if(e&&e.value) q[key]=e.value;
+    }
+  });
+  if(q.from) localStorage.setItem('f_from',q.from);
+  if(q.to) localStorage.setItem('f_to',q.to);
+  const pt=document.getElementById('piiToggle');
+  if(pt&&pt.checked) q.pii='1';
+  const us=document.getElementById('unitSel');
+  if(us&&us.value!=='calls') q.unit=us.value;
+  return q;
+}
+
+/* ---------------- render ---------------- */
+/* left sidebar: [id, label, icon] — '#' rows are group headings */
+/* NAV — grouped into four chunks (2026-08-08 cognitive-load pass).
+   It was 22 flat items under one heading. Working memory holds ~4 chunks
+   (Cowan), and Hick's law makes choice time grow with log2(n): 22 flat options
+   is ~4.5 bits of decision every time you look at the sidebar, and because
+   every item is rendered identically there is no pop-out — finding one is a
+   serial scan of all 22. Four labelled groups of 4-7 turn one long scan into
+   "which group?" then "which of five?" — about 2.3 + 2.3 bits, and the group
+   headings become learnable landmarks so the second visit is near-instant.
+   NOTHING WAS REMOVED. Every section is still one click away. */
+const TABS=[
+  ['#','Daily work',''],
+  ['today','Overview','▦'],['daily','Daily Report','▤'],
+  ['daybyday','Day by day','▨'],['projects','By project','◫'],
+  ['attend','Attendance','✓'],
+  ['leadsboard','Leads board','▤'],['profile','Lead lookup','☰'],
+  ['funnel3','Funnel','⧗'],
+
+  ['#','What went wrong',''],
+  ['pending','Still pending','⧗'],['insights','Insights','✦'],
+  ['integrity','Integrity','⚑'],['audit','Audit','⚖'],
+  ['dbhealth','Database health','⛁'],['negatives','Negatives','−'],
+
+  ['#','Conversation quality',''],
+  ['cif','CIF scores','◎'],['qa','QA & to-do','☑'],
+  ['builder','Builder metrics','⌁'],['intent','Intent','◈'],
+  ['positives','Positives','+'],
+
+  ['#','Channels',''],
+  ['metrics','Call metrics','⏱'],['whatsapp','WhatsApp','✉'],
+  ['visits','Site visits','⌂'],
+
+  ['#','Reference',''],
+  ['numbers','Numbers','∑'],['cohorts','AI vs Human','⇄'],
+  ['eras','Eras','◷'],['globe','Geography','◍'],['review','Review panel','?'],
+];
+const TAB_ALIAS={fboard:'funnel3'};              // legacy click targets keep working
+function gotoTab(id){
+  id=TAB_ALIAS[id]||id;
+  const b=document.querySelector('#nav button[data-tab="'+id+'"]');
+  if(b) b.click();
+}
+
+function buildNav(){
+  const nav=document.getElementById('nav');
+  if(nav.children.length) return;
+  TABS.forEach(([id,label,icon],i)=>{
+    if(id==='#'){ nav.appendChild(el('div','navgroup',esc(label))); return; }
+    const b=el('button',i?'':'on',
+      '<i>'+esc(icon)+'</i><span class="lbl">'+esc(label)+'</span>');
+    b.title=label; b.dataset.tab=id;
+    b.onclick=()=>{
+      nav.querySelectorAll('button').forEach(x=>x.classList.remove('on'));
+      b.classList.add('on');
+      document.querySelectorAll('section').forEach(s=>s.classList.remove('on'));
+      document.getElementById('s-'+id).classList.add('on');
+      document.getElementById('pageTitle').textContent=label;
+      localStorage.setItem('tab',id);
+      window.scrollTo({top:0,behavior:'smooth'});
+    };
+    nav.appendChild(b);
+  });
+  // The first TABS entry is now a group HEADING, not a button. Falling back to
+  // children[0] would click a <div> and leave every section hidden, so resolve
+  // to the first real button instead.
+  const saved=TAB_ALIAS[localStorage.getItem('tab')]||localStorage.getItem('tab')||'today';
+  const target=nav.querySelector('button[data-tab="'+saved+'"]')||nav.querySelector('button');
+  if(target) target.click();
+}
+
+function render(){
+  document.getElementById('sub').textContent =
+    `${D.meta.from} → ${D.meta.to} (IST) · reading a local cache of 4 databases · phone numbers pseudonymised`;
+  // move the live nodes — copying innerHTML would strip every click handler
+  // and silently make the whole headline strip inert (audit finding #17)
+  document.getElementById('kpis').replaceChildren(...kpiRow(D.kpis).children);
+  buildNav();
+
+  // ---- TODAY (Kurma cockpit)
+  let s=document.getElementById('s-today'); s.innerHTML='';
+  if(D.cockpit){
+    const K=D.cockpit;
+    s.appendChild(el('h2',null,'Today \u2014 '+esc(K.day)+' (latest data day)'+
+      '<span class="fixedwin">fixed window \u2014 global date filters do not apply here</span>'));
+    if(K.digest.idle_hours&&K.digest.idle_hours>6)
+      s.appendChild(el('div','note','\u26a0\ufe0f <b>DIALLER IDLE '+
+        Math.round(K.digest.idle_hours)+' hours</b> \u2014 no calls are being made. '+
+        'Nothing else on this screen matters until dialling resumes.'));
+    const grid_=el('div','cockcards');
+    K.cards.forEach(c=>{
+      const card=el('div','ccard'+(c.accent==='good'?' good':c.accent==='bad'?' bad':''));
+      card.appendChild(el('div','l',esc(c.label)));
+      card.appendChild(el('div','v',esc(c.value)));
+      if(c.delta!=null) card.appendChild(el('div','d',(c.delta>=0?'+':'')+c.delta+' vs previous day'));
+      card.onclick=()=>{
+        if(c.target.irule){
+          const q=currentQuery(); q.irule=c.target.irule;
+          fetch('/api/data?'+new URLSearchParams(q)).then(r=>r.json()).then(j=>{
+            if(!j.error&&!j.no_rows){D=j;render();}
+            gotoTab(c.target.tab);
+          });
+        } else { gotoTab(c.target.tab); }
+      };
+      grid_.appendChild(card);
+    });
+    s.appendChild(grid_);
+
+    // PARASHURAMA overview strips: broken → funnel → cost, one screen
+    if(D.insights){
+      const fails=D.insights.filter(i=>i.severity==='fail').slice(0,3);
+      if(fails.length){
+        s.appendChild(el('h2',null,'Systemic failures right now'));
+        fails.forEach(i=>{
+          const c_=el('div','insight fail');
+          c_.appendChild(el('div','role',esc(i.category)+' · '+esc(i.importance||'')));
+          c_.appendChild(el('div','t',esc(i.title)));
+          c_.appendChild(el('div','cap',esc(i.detail).slice(0,220)+' → full detail on the Insights tab'));
+          c_.onclick=()=>gotoTab(i.target||'insights');
+          s.appendChild(c_);
+        });
+      }
+    }
+    if(D.bands){
+      s.appendChild(el('h2',null,'Funnel at a glance — click a band to open it'));
+      const strip=el('div','bands');
+      const BC={TOFU:'#2a78d6',MOFU:'#d99114',BOFU:'#0a8a0a',OUT:'#8a8f98',Unstaged:'#c9ced6'};
+      D.bands.bands.forEach(bd=>{
+        const k=el('div','band'); k.style.borderTop='4px solid '+(BC[bd.band]||'#ccc');
+        k.appendChild(el('div','l',bd.band)); k.appendChild(el('div','n',bd.humans.toLocaleString()));
+        k.onclick=()=>gotoTab('funnel3');
+        strip.appendChild(k);
+      });
+      s.appendChild(strip);
+    }
+    if(D.cost){
+      s.appendChild(el('div','note','💰 <b>₹'+D.cost.total_inr.toLocaleString()+'</b> est. spend in range · '+
+        '<b>'+D.cost.never_connected_pct+'%</b> never reached a human'+
+        (D.cost.per_booked?' · ₹'+D.cost.per_booked.toLocaleString()+'/booked':'')+
+        (D.cost.per_attended_alltime?' · ₹'+D.cost.per_attended_alltime.toLocaleString()+'/attended':'')+
+        ' — breakdown on Call metrics.'));
+    }
+
+    // daily digest
+    s.appendChild(el('h2',null,'Daily audit \u2014 in one glance'));
+    const dg=el('div','digestbox');
+    const mk_=(title,items,color)=>{
+      const c=el('div','card');
+      c.appendChild(el('h3',null,title));
+      const ul=el('div');
+      (items&&items.length?items:['\u2014']).forEach(x=>{
+        const row=el('div',null,'\u2022 '+esc(x)); row.style.margin='4px 0';
+        if(color) row.style.color=color;
+        ul.appendChild(row);});
+      c.appendChild(ul); return c;};
+    dg.appendChild(mk_('What went RIGHT',K.digest.right,'#008300'));
+    dg.appendChild(mk_('What went WRONG',K.digest.wrong,'#e34948'));
+    dg.appendChild(mk_('Do this now',K.digest.actions,null));
+    s.appendChild(dg);
+    s.appendChild(el('div','cap','This digest is auto-saved to RELEASES/daily/'+esc(K.day)+'.md'));
+
+    // call room
+    s.appendChild(el('h2',null,'Call Room \u2014 listen and read, one place'));
+    s.appendChild(el('div','note',esc(K.callroom.note)));
+    const room=el('div','grid2');
+    const side=(title,list,color)=>{
+      const box=el('div');
+      box.appendChild(el('h3',null,title));
+      if(!list.length) box.appendChild(el('div','cap','None found for this pool.'));
+      list.forEach(c=>{
+        const cc=el('div','callcard');
+        cc.style.borderLeft='4px solid '+color;
+        cc.appendChild(el('div',null,
+          `<b>${esc(c.lead_ref)}</b> \u00b7 ${esc(c.when)} \u00b7 ${esc(c.outcome)} \u00b7 `+
+          `${c.dur}s \u00b7 <i>${esc(c.why)}</i>`));
+        if(c.audio){
+          const au=document.createElement('audio');
+          au.controls=true; au.preload='none'; au.src=c.audio;
+          au.onerror=()=>{au.replaceWith(el('div','cap',
+            'audio unavailable (expired or auth-gated) \u2014 transcript below'));};
+          cc.appendChild(au);
+        } else {
+          cc.appendChild(el('div','cap','no playable recording \u2014 transcript only'));
+        }
+        if(c.summary) cc.appendChild(el('div','cap',esc(c.summary)));
+        const sp=el('div','tsplit');
+        const p1=el('div','tpane'); p1.innerHTML='<b>Agent said</b>'+esc(c.transcript_agent||'(empty)');
+        const p2=el('div','tpane'); p2.innerHTML='<b>Customer said</b>'+esc(c.transcript_lead||'(empty)');
+        sp.appendChild(p1); sp.appendChild(p2);
+        cc.appendChild(sp);
+        box.appendChild(cc);
+      });
+      return box;};
+    room.appendChild(side('\u2b50 Best of the day',K.callroom.best,'#008300'));
+    room.appendChild(side('\u26a0\ufe0f Worst of the day',K.callroom.worst,'#e34948'));
+    s.appendChild(room);
+  }
+
+  // ---- DAILY REPORT (RAMA-3): the Growth-Reports table, every cell clickable
+  renderDailyReport();
+  // ---- LEADS BOARD (RAMA-7): builds once, then refreshes on its own filters
+  initLeadsBoard();
+  // ---- QA & to-do (RAMA-8) and Builder metrics (RAMA-9)
+  initQA();
+  initBuilder();
+  // ---- Day by day · By project · Attendance (the goal's sensor)
+  initDayByDay();
+  initProjects();
+  initAttend();
+  initPending();
+  initDbHealth();
+
+  // ---- FUNNEL BOARD (Kurma-2)
+  // ---- FUNNEL tab: TOFU/MOFU/BOFU bands from the truth layer, then the
+  // per-project daily stage table, then the original stage classification.
+  s=document.getElementById('s-funnel3'); s.innerHTML='';
+  if(D.bands){
+    s.appendChild(el('h2',null,'Funnel \u2014 TOFU / MOFU / BOFU (both truth systems)'));
+    s.appendChild(el('div','note',esc(D.bands.note)+' <b>'+D.bands.disagree_total+
+      ' leads</b> currently disagree between Zoho and Intelligent_CRM.'));
+    const wrap=el('div','bands');
+    const detail=el('div');
+    const BCOL={TOFU:'#2a78d6',MOFU:'#d99114',BOFU:'#0a8a0a',OUT:'#8a8f98',Unstaged:'#c9ced6'};
+    D.bands.bands.forEach(bd=>{
+      const card=el('div','band');
+      card.style.borderTop='4px solid '+(BCOL[bd.band]||'#ccc');
+      card.appendChild(el('div','l',bd.band==='OUT'?'OUT (not interested / spam)':bd.band));
+      card.appendChild(el('div','n',bd.humans.toLocaleString()));
+      if(bd.disagree) card.appendChild(el('div','cap',bd.disagree+' disagree'));
+      card.onclick=()=>{
+        document.querySelectorAll('.band').forEach(x=>x.classList.remove('on'));
+        card.classList.add('on');
+        detail.innerHTML='';
+        detail.appendChild(el('h2',null,bd.band+' \u2014 every lead, click any id to open it'));
+        detail.appendChild(tableEl(bd.tbl));
+        detail.appendChild(el('div','cap','source: Zoho_Database.leads.stage vs Intelligent_CRM.crm_leads.stage'));
+        detail.scrollIntoView({behavior:'smooth',block:'nearest'});
+      };
+      wrap.appendChild(card);
+    });
+    s.appendChild(wrap);
+    s.appendChild(detail);
+    if(D.project_funnel){
+      s.appendChild(el('h2',null,'Funnel by project — each building on its own terms'));
+      s.appendChild(el('div','note',esc(D.project_funnel.note)));
+      const pt=tableEl(D.project_funnel.table); s.appendChild(pt);
+      const pdet=el('div'); s.appendChild(pdet);
+      // click a project row -> its own funnel
+      pt.querySelectorAll('tbody tr').forEach(tr=>{
+        const name=tr.querySelector('td') && tr.querySelector('td').textContent.trim();
+        const det=D.project_funnel.detail[name]; if(!det) return;
+        tr.style.cursor='pointer'; tr.title='Open the '+name+' funnel';
+        tr.onclick=()=>{
+          pdet.innerHTML='';
+          pdet.appendChild(el('h2',null,name+' — its own funnel'));
+          pdet.appendChild(grid(2,
+            card('Funnel',hbar(det.funnel),'each step as a % of the step above / of leads'),
+            card('Outcome mix',hbar(det.outcomes,{probe:'outcome'}),'click a bar to investigate those calls')));
+          pdet.appendChild(card('Where its leads stand',hbar(det.bands),'TOFU / MOFU / BOFU from both truth systems'));
+          pdet.scrollIntoView({behavior:'smooth',block:'nearest'});
+        };
+      });
+    }
+    if(D.persona){
+      s.appendChild(el('h2',null,'Which agent was on the phone'));
+      s.appendChild(el('div','note',esc(D.persona.note)+' Labelled on <b>'+
+        D.persona.named.toLocaleString()+'</b> of '+D.persona.total.toLocaleString()+' calls.'));
+      const pc=card(null,null);
+      if(D.persona.series.length){ pc.appendChild(legend(D.persona.series));
+        pc.appendChild(vstack(D.persona.dates,D.persona.series,{h:180})); }
+      pc.appendChild(el('div','cap','A sharp changeover means every metric that spans it compares two different agents.'));
+      s.appendChild(pc);
+    }
+    if(D.bands.daily_stage){
+      s.appendChild(el('h2',null,'Per-project daily stages \u2014 the Growth-Reports layout'));
+      s.appendChild(el('div','note',esc(D.bands.daily_stage.note)));
+      s.appendChild(tableEl(D.bands.daily_stage));
+    }
+  }
+  if(D.fboard){
+    const F=D.fboard;
+    s.appendChild(el('h2',null,'Every lead, classified \u2014 '+F.total.toLocaleString()+' humans dialled'));
+    s.appendChild(el('div','note','Stage = the lead\u2019s FULL history distilled: later events '+
+      'override earlier ones, DNC suppresses everything, and \u201cbooked then went cold\u201d '+
+      'is its own bucket because those are the highest-value rescues in the building. '+
+      'Click a stage to open its leads.'));
+    const grid_=el('div','cockcards');
+    F.cards.forEach(c=>{
+      const card=el('div','ccard'+(F.selected===c.id?' good':''));
+      card.style.borderTop='4px solid '+c.color;
+      card.appendChild(el('div','l',esc(c.label)));
+      card.appendChild(el('div','v',c.value.toLocaleString()));
+      card.appendChild(el('div','d',c.pct+'% of dialled humans'));
+      card.onclick=async()=>{
+        const q=currentQuery(); q.fstage=c.id;
+        document.getElementById('sub').textContent='loading stage\u2026';
+        const j=await (await fetch('/api/data?'+new URLSearchParams(q))).json();
+        if(!j.error&&!j.no_rows){D=j;render();
+          document.querySelectorAll('nav button').forEach(b=>{
+            if(b.textContent==='Funnel board') b.click();});}
+      };
+      grid_.appendChild(card);
+    });
+    s.appendChild(grid_);
+    if(F.detail){
+      const lbl=F.cards.find(c=>c.id===F.selected);
+      s.appendChild(el('h2',null,(lbl?lbl.label:'Stage')+' \u2014 the leads'));
+      s.appendChild(tableEl(F.detail));
+    }
+    s.appendChild(el('h2',null,'Follow-ups \u2014 due and recommended'));
+    if(F.followups){
+      s.appendChild(card('Scheduled follow-ups still pending',tableEl(F.followups)));
+    }
+    s.appendChild(el('div','note',esc(F.hours_note)));
+    s.appendChild(card('Recommended next-dial hour per workable lead',tableEl(F.recommend)));
+  }
+
+  // ---- Numbers
+  s=document.getElementById('s-numbers'); s.innerHTML='';
+  s.appendChild(el('h2',null,'Daily call trigger count'));
+  const c1=card(null,null); c1.appendChild(legend(D.daily.series));
+  c1.appendChild(vstack(D.daily.dates,D.daily.series)); s.appendChild(c1);
+  if(D.funnel_x&&D.funnel_x.steps&&D.funnel_x.steps.length){
+    s.appendChild(el('h2',null,'The whole journey \u2014 lead to site visit'));
+    s.appendChild(el('div','note','Each bar names its source. Dialler stages respect your filters; '+
+      '[ops sheet] stages come from the manually maintained workbooks and cover the AI campaign. '+
+      '<b>step %</b> in the tooltip = conversion from the previous bar.'));
+    s.appendChild(card(null, hbar(D.funnel_x.steps)));
+    if(D.funnel_x.note) s.appendChild(el('div','cap',esc(D.funnel_x.note)));
+  }
+  s.appendChild(el('h2',null,'Where the funnel leaks'));
+  if(D.funnel_note) s.appendChild(el('div','note',D.funnel_note));
+  s.appendChild(grid(3,
+    card('Dial funnel',hbar(D.funnel)),
+    card('Outcome mix',hbar(D.outcome_mix,{probe:'outcome'}),'source: angad.calls.outcome \u00b7 click a bar to filter'),
+    card('CRM stage (Intelligent_CRM)',hbar(D.crm_stage,{dim:'stage'}),
+         D.crm_stage.length?'':'crm_leads not in the cache yet')));
+  s.appendChild(grid(2,
+    card('Dial status',hbar(D.status_mix,{probe:'status'}),'source: angad.calls.status \u00b7 click to filter'),
+    card('Attempts per lead',hbar(D.retry,{probe:'attempts'}),'Click a bar to see those exact calls — what they talked about, whether they got frustrated, and why they were dialled that many times.')));
+
+  // ---- Positives
+  s=document.getElementById('s-positives'); s.innerHTML='';
+  s.appendChild(el('h2',null,'Who was called — with their profile'));
+  s.appendChild(el('div','note','Profile columns are joined from the other three '+
+    'databases: <b>budget / timeline / intent / objections</b> come from '+
+    '<code>ASBLVoiceBot.call_transcripts</code>, <b>project / campaign / UTM</b> from '+
+    '<code>Zoho_Database.leads</code>, <b>stage</b> from <code>Intelligent_CRM.crm_leads</code>. '+
+    'They are empty in <code>angad.calls</code> itself.'));
+  s.appendChild(tableEl(D.called));
+  s.appendChild(el('h2',null,'When were they called'));
+  s.appendChild(grid(2,
+    card('Dials by hour (IST)',vstack(D.by_hour.labels,
+      [{name:'Calls',color:'#2a78d6',values:D.by_hour.calls}],{h:230})),
+    card('Connect rate by hour (IST)',vstack(D.by_hour.labels,
+      [{name:'Connect %',color:'#008300',values:D.by_hour.reach_pct}],{h:230,unit:'%'}),
+      'The most actionable scheduling number here — dial into the hours that answer.')));
+  s.appendChild(grid(2,
+    card('Dials by weekday',hbar(D.by_weekday,{dim:'weekday'}),'source: angad.calls \u00b7 click to filter'),
+    slotCard('Language spoken',D.languages)));
+  s.appendChild(el('h2',null,'What did they ask'));
+  s.appendChild(el('div','note','These come from <code>ASBLVoiceBot.call_transcripts</code>, '+
+    'joined <b>per call</b> on <code>call_sid = roomName</code>. The fields exist on most '+
+    'transcripts but are usually left blank by the extractor, so each card states how many '+
+    'calls actually carry a value \u2014 read the coverage line before trusting a shape.'));
+  s.appendChild(grid(3,
+    slotCard('Objections raised',D.objections,'#eb6834'),
+    slotCard('Budget stated',D.budgets),
+    slotCard('Timeline stated',D.timelines)));
+  s.appendChild(grid(3,
+    slotCard('Intent',D.intents),
+    slotCard('Unit preference',D.unit_pref),
+    slotCard('Agreed to a site visit',D.site_visit_agreed,'#008300')));
+  s.appendChild(el('h2',null,'What projects were picked up'));
+  s.appendChild(grid(3,
+    card('Projects',hbar(D.projects)),
+    card('Campaigns',hbar(D.campaigns)),
+    card('UTM source',hbar(D.utm))));
+  if(D.sources){
+    s.appendChild(el('h2',null,'Where the leads came from — URL & source intelligence'));
+    s.appendChild(el('div','note',esc(D.sources.note)));
+    const sgrid=el('div','grid2');
+    [['lead_source','By lead source'],['utm_source','By UTM source'],
+     ['campaign','By campaign'],['first_page','By first page visited'],
+     ['referrer','By referrer']].forEach(([k,t])=>{
+      if(D.sources[k]) sgrid.appendChild(card(t,tableEl(D.sources[k])));
+    });
+    s.appendChild(sgrid);
+  }
+  s.appendChild(el('h2',null,'What was told to them'));
+  s.appendChild(tableEl(D.transcripts));
+
+  // ---- Negatives
+  s=document.getElementById('s-negatives'); s.innerHTML='';
+  s.appendChild(el('h2',null,'Who was missed'));
+  s.appendChild(kpiRow(D.missed_kpis));
+  s.appendChild(tableEl(D.missed));
+  s.appendChild(el('h2',null,'Who dropped — and where in the call'));
+  s.appendChild(el('div','note','<b>Root cause is not in the database.</b> The carrier '+
+    'hangup cause (HangupCause/CauseName) and the AMD human-vs-machine result are '+
+    'logged by the agent but never written to Mongo. So <b>“technical vs call failure” '+
+    'cannot be answered from data today</b> — the stage below is <i>inferred</i> from '+
+    'transcript shape and duration. Persisting those two fields is the highest-value '+
+    'schema change for this dashboard.'));
+  if(D.drop_kpis.length){
+    s.appendChild(kpiRow(D.drop_kpis));
+    s.appendChild(grid(2,
+      card('When did they drop (inferred stage)',hbar(D.drop_stage,{probe:'drop_stage'}),'source: angad.calls transcript timing · click a bar to filter'),
+      card('How long before the drop',hbar(D.drop_hist,{color:'#e34948'}))));
+    s.appendChild(el('h2',null,'Whoever dropped — contacted again? when did he answer?'));
+    s.appendChild(tableEl(D.drops));
+  } else s.appendChild(card(null,el('div','cap','No DROPPED calls in this selection.')));
+  s.appendChild(el('h2',null,'Rejections & do-not-call'));
+  s.appendChild(tableEl(D.rejected));
+
+  // ---- WhatsApp
+  s=document.getElementById('s-whatsapp'); s.innerHTML='';
+  s.appendChild(el('h2',null,'WhatsApp'));
+  s.appendChild(el('div','note','From <code>Zoho_Database.whatsapp_messages</code> '+
+    '(per-lead aggregate) and <code>doc_send_log</code>. The WhatsApp fields inside '+
+    '<code>angad.calls</code> are all empty — the bot writes them here instead.'));
+  s.appendChild(kpiRow(D.wa_kpis));
+  s.appendChild(grid(2,
+    card('What was sent (document type)',hbar(D.wa_docs)),
+    card('Send outcome',hbar(D.wa_outcome))));
+  if(D.wa_replies){
+    s.appendChild(el('h2',null,'Customers who WROTE BACK \u2014 the hot-reply queue'));
+    s.appendChild(el('div','note','Per-message inbound WhatsApp from <code>Intelligent_CRM.messages</code> '+
+      'with a classified intent. These people raised their hand in writing \u2014 '+
+      '<b>this queue outranks every outbound list in the building</b>.'));
+    s.appendChild(kpiRow([
+      {label:'Inbound replies',value:D.wa_replies.total.toLocaleString()},
+      {label:'Unique leads replying',value:D.wa_replies.leads.toLocaleString()},
+    ]));
+    if(D.wa_replies.intents&&D.wa_replies.intents.length)
+      s.appendChild(card('What they asked for',hbar(D.wa_replies.intents)));
+    if(D.wa_hot) s.appendChild(tableEl(D.wa_hot));
+  }
+  s.appendChild(el('h2',null,'Who was texted'));
+  s.appendChild(tableEl(D.wa));
+  s.appendChild(el('h2',null,'What was sent to whom'));
+  s.appendChild(tableEl(D.wa_doc_log));
+  s.appendChild(el('h2',null,'What they said on the call'));
+  s.appendChild(tableEl(D.wa_said));
+
+  // ---- Audit
+  s=document.getElementById('s-audit'); s.innerHTML='';
+  if(D.freshness){
+    s.appendChild(el('h2',null,'Source freshness — which part of the database is actually moving'));
+    s.appendChild(el('div','note',esc(D.freshness.note)));
+    s.appendChild(tableEl(D.freshness));
+  }
+  if(D.audit){
+    const A=D.audit;
+    s.appendChild(el('h2',null,'Who was actually called \u2014 humans vs leads vs dials'));
+    s.appendChild(el('div','note',esc(A.pyramid_note)));
+    s.appendChild(grid(2,
+      card('Identity pyramid', hbar(A.pyramid)),
+      card('How many times each human was called', hbar(A.calls_per_human))));
+    s.appendChild(kpiRow(A.calls_per_human_kpis));
+    s.appendChild(el('h2',null,'Does redialling work? \u2014 outcomes by attempt number'));
+    s.appendChild(grid(2,
+      card('Dials by attempt number', vstack(A.by_attempt.labels,
+        [{name:'Dials',color:'#2a78d6',values:A.by_attempt.dials}],{h:230})),
+      card('Connect rate by attempt number', vline(A.by_attempt.labels,
+        [{name:'Connect %',color:'#008300',values:A.by_attempt.connect_pct}],{h:230,unit:'%'}),
+        'If this line is flat or falling, extra redials are not converting \u2014 they are cost.')));
+    s.appendChild(el('h2',null,'Connect & real-conversation rate over time'));
+    const dr=card(null,null);
+    dr.appendChild(legend([{name:'Connect %',color:'#2a78d6'},{name:'Real conversation %',color:'#008300'}]));
+    dr.appendChild(vline(A.daily_rates.dates,
+      [{name:'Connect %',color:'#2a78d6',values:A.daily_rates.connect_pct},
+       {name:'Real conversation %',color:'#008300',values:A.daily_rates.talk_pct}],{h:250,unit:'%'}));
+    s.appendChild(dr);
+    if(A.timing){
+      s.appendChild(el('h2',null,'When does Hyderabad answer? \u2014 connect rate by hour \u00d7 weekday'));
+      s.appendChild(card(null, heatmap(A.timing.heatmap)));
+      if(A.timing.speed&&A.timing.speed.length){
+        s.appendChild(el('h2',null,'Speed to lead \u2014 does dialling fast buy connection?'));
+        if(A.timing.speed_note) s.appendChild(el('div','note',esc(A.timing.speed_note)));
+        s.appendChild(card('Leads by first-dial delay (label shows % ever connected)',
+          hbar(A.timing.speed.map(x=>({label:x.label+'  \u2192 '+x.pct+'% connected',value:x.value})))));
+      }
+    }
+    if(A.pipeline&&A.pipeline.hops&&A.pipeline.hops.length){
+      s.appendChild(el('h2',null,'Where call records vanish \u2014 dialler to CRM'));
+      s.appendChild(el('div','note','A dial should flow dialler \u2192 schedules \u2192 transcript '+
+        '\u2192 recording \u2192 posthook \u2192 CRM. Each row shows how many of the '+
+        (A.pipeline.hops[0].rows||0).toLocaleString()+' dials that store can account for. '+
+        '<b>The CRM re-dials what it cannot see</b> \u2014 this table is the root cause of the '+
+        'booked-lead redials and DNC violations on the Integrity tab. The fix is the webhook '+
+        'cutover named in the data dictionary (repoint angad.webhooks.url at the new CRM).'));
+      const pt={cols:['store','rows','dials accounted for','% of dials','note'],
+        rows:A.pipeline.hops.map(h=>[h.store,h.rows,h.matched,h.pct+'%',h.note||'']),
+        total:A.pipeline.hops.length,shown:A.pipeline.hops.length};
+      s.appendChild(tableEl(pt));
+      if(A.pipeline.blind){
+        s.appendChild(el('h2',null,'CRM blindness by outcome'));
+        s.appendChild(el('div','note','Calls whose result exists in the dialler log but in neither '+
+          'the posthook store nor Intelligent_CRM \u2014 outcomes the CRM never learned.'));
+        s.appendChild(tableEl(A.pipeline.blind));
+      }
+    }
+    if(A.recon){
+      s.appendChild(el('h2',null,'Zoho CRM \u2194 dialler reconciliation'));
+      s.appendChild(el('div','note',esc(A.recon.note)));
+      s.appendChild(card('Where every lead went (window = your date filter, on Lead Received At)',
+        hbar(A.recon.rows)));
+    }
+    if(A.status_vs_dialler){
+      s.appendChild(el('h2',null,'Zoho lead status vs what the dialler actually saw'));
+      s.appendChild(el('div','note','Rows where Zoho says a status but the dialler never reached the '+
+        'person (or vice versa) are the sync gap, per lead.'));
+      s.appendChild(tableEl(A.status_vs_dialler));
+    }
+    if(A.sync_gaps&&A.sync_gaps.length){
+      s.appendChild(el('h2',null,'CRM sync gaps proven by the export'));
+      A.sync_gaps.forEach(g=>{
+        const n=el('div','note',esc(g)); n.style.borderLeftColor='#e34948'; s.appendChild(n);
+      });
+    }
+  }
+
+  // ---- Integrity
+  s=document.getElementById('s-integrity'); s.innerHTML='';
+  if(D.integrity){
+    const I=D.integrity;
+    s.appendChild(el('h2',null,'Integrity \u2014 everything that can go wrong, counted'));
+    s.appendChild(el('div','note','Each rule is computed live from the call log under the current '+
+      'filters (sequencing rules look at the full history so a violation cannot hide behind a '+
+      'date filter). <b>A non-zero count is either a bug to fix or a decision to accept \u2014 '+
+      'never something to ignore.</b> Click a rule to open the offending rows.'));
+    s.appendChild(kpiRow(I.health));
+    const bars=I.rules.filter(r=>r.count>0).map(r=>({label:r.name,value:r.count,
+      color:I.colors[r.severity]||'#8a8f98'}));
+    if(bars.length) s.appendChild(card('Findings by rule (colour = severity)',hbar(bars)));
+    else s.appendChild(card(null,el('div','cap','No violations under the current filters.')));
+
+    const t={cols:['severity','rule','count','what it means','second-order effect'],
+      rows:I.rules.map(r=>[r.severity,r.name,r.count,r.why,r.second_order]),
+      total:I.rules.length,shown:I.rules.length};
+    s.appendChild(el('h2',null,'All rules'));
+    s.appendChild(tableEl(t));
+
+    s.appendChild(el('h2',null,'Drill into one rule'));
+    const sel=el('select'); const opt0=el('option',null,'\u2014 pick a rule \u2014'); opt0.value='';
+    sel.appendChild(opt0);
+    I.rules.forEach(r=>{const o=el('option',null,`${esc(r.name)} (${r.count.toLocaleString()})`);
+      o.value=r.id; if(I.selected===r.id) o.selected=true; sel.appendChild(o);});
+    sel.onchange=async()=>{
+      const q=currentQuery(); if(sel.value) q.irule=sel.value;
+      document.getElementById('sub').textContent='loading rule\u2026';
+      const j=await (await fetch('/api/data?'+new URLSearchParams(q))).json();
+      if(!j.error&&!j.no_rows){ D=j; render();
+        document.querySelectorAll('nav button').forEach(x=>{
+          if(x.textContent==='Integrity') x.click();});
+      }
+    };
+    s.appendChild(card(null,sel));
+    const chosen=I.rules.find(r=>r.id===I.selected);
+    if(chosen&&chosen.detail){
+      s.appendChild(el('h2',null,esc(chosen.name)+' \u2014 offending rows'));
+      s.appendChild(tableEl(chosen.detail));
+    }
+  }
+
+  // ---- AI vs Human cohorts
+  s=document.getElementById('s-cohorts'); s.innerHTML='';
+  if(D.cohorts&&D.cohorts.available){
+    const C=D.cohorts;
+    s.appendChild(el('h2',null,'AI caller vs Human callers \u2014 the standing comparison'));
+    s.appendChild(el('div','note','Sources: the <b>Humans &amp; AI Calling</b> workbook (auto-imported '+
+      'from Downloads on every sync) + the dialler log. Every row names its unit \u2014 '+
+      'lead rows, humans, or calls \u2014 so numbers from different systems are never mixed silently. '+
+      'Dialler-derived rows respect the current date filter.'));
+    s.appendChild(tableEl(C.compare));
+    if(C.attribution&&C.attribution.length){
+      s.appendChild(el('h2',null,'Attribution check \u2014 who really earned the visit?'));
+      s.appendChild(card('Manual verification of visits credited to the AI',
+        hbar(C.attribution),
+        'From the TRUE / FALSE sheets of the Confirmed Site Visits workbook.'));
+    }
+    if(C.daily){
+      s.appendChild(el('h2',null,'Daily: ops sheet vs system of record'));
+      s.appendChild(el('div','note','Where <b>sheet</b> and <b>sys</b> disagree, the system of '+
+        'record wins \u2014 the sheet is hand-maintained. Persistent gaps mean the sheet\u2019s '+
+        'definition drifted (it counts unique leads per day, not calls).'));
+      s.appendChild(tableEl(C.daily));
+    }
+  } else {
+    s.appendChild(el('div','cap','Cohort workbooks not imported \u2014 run: python import_cohorts.py'));
+  }
+
+  // ---- Site visits
+  s=document.getElementById('s-visits'); s.innerHTML='';
+  if(D.visits_tab){
+    renderVisits(s, D.visits_tab);
+  } else {
+    s.appendChild(el('div','cap','Site-visit data not loaded \u2014 run a sync.'));
+  }
+
+  // ---- Intent
+  s=document.getElementById('s-intent'); s.innerHTML='';
+  if(D.intent_tab && D.intent_tab.available && D.intent_tab.rows){
+    const I=D.intent_tab;
+    s.appendChild(el('h2',null,'Post-call intent analysis (LLM pass over every transcript)'));
+    s.appendChild(el('div','note','Source: <code>ASBLVoiceBot.call_transcript_intent_identification</code>, '+
+      'joined per call. In this selection: <b>'+I.rows.toLocaleString()+'</b> analysed calls, of which '+
+      '<b>'+I.extracted.toLocaleString()+'</b> ('+I.extracted_pct+'%) contained a readable conversation \u2014 '+
+      'everything below describes those conversations. The rest were voicemail, silence or too short to analyse.'));
+    s.appendChild(kpiRow(I.scorecard));
+    s.appendChild(grid(2,
+      card('Why calls could not be analysed', hbar(I.skip)),
+      card('How far conversations got (stage reached)', hbar(I.stage),
+        'The classic sales funnel inside the call itself \u2014 most conversations never leave the greeting.')));
+    s.appendChild(grid(3,
+      card('Caller intent', hbar(I.caller_intent)),
+      card('Intent strength', hbar(I.strength)),
+      card('Customer sentiment', hbar(I.sentiment))));
+    s.appendChild(grid(3,
+      card('Customer engagement', hbar(I.engagement)),
+      card('Talk balance', hbar(I.talk_balance),
+        'agent_only means the customer said essentially nothing.'),
+      card('Urgency', hbar(I.urgency))));
+    s.appendChild(grid(3,
+      card('Site-visit outcome inside the call', hbar(I.visit_outcome)),
+      card('Objections (normalised)', hbar(I.objections,{color:'#eb6834'})),
+      card('Conversation language', hbar(I.language))));
+    s.appendChild(grid(2,
+      card('BHK requirement stated', hbar(I.bhk)),
+      card('Budget stated', hbar(I.budget))));
+    if(I.hot_leads&&I.hot_leads.rows&&I.hot_leads.rows.length){
+      s.appendChild(el('h2',null,'Hot leads \u2014 strong or moderate intent, with the AI\u2019s own summary'));
+      s.appendChild(tableEl(I.hot_leads));
+    }
+  } else {
+    s.appendChild(el('div','cap','No intent-identification rows in this selection.'));
+  }
+
+  // ---- Metrics
+  s=document.getElementById('s-metrics'); s.innerHTML='';
+  s.appendChild(el('h2',null,'Call metrics — all'));
+  if(D.latency){
+    s.appendChild(el('div','note','<b>Latency PROXY</b> (first agent turn minus call start, '+
+      'from transcript timestamps — the true wire latency is not persisted): median '+
+      D.latency.median+'s, p90 '+D.latency.p90+'s over '+D.latency.n.toLocaleString()+
+      ' calls. Slow starts (≥8s): '+D.latency.slow_share+'% of calls — drop rate '+
+      D.latency.drop_when_slow+'% when slow vs '+D.latency.drop_when_fast+
+      '% when fast. Read with care: calls where the agent NEVER spoke are invisible to this proxy — catastrophic-latency drops are excluded by construction. Among calls that got a first turn, slow starts do NOT drop more.'));
+  }
+  s.appendChild(el('div','note','Per-call <b>latency</b> and <b>cost</b> are not '+
+    'persisted anywhere (console-log / computed at runtime), so they cannot be '+
+    'charted. Tokens below stand in for cost.'));
+  s.appendChild(kpiRow(D.metric_kpis));
+  s.appendChild(grid(2,
+    card('Duration distribution (connected)',hbar(D.dur_hist)),
+    card('Conversation depth vs outcome',
+      hbar(D.depth_chart.map(d=>({label:d.label,value:Math.round(d.value*10)/10,color:d.color}))),
+      'Median turns per call.')));
+  s.appendChild(card('Depth table',tableEl(D.depth)));
+  if(D.tq){
+    s.appendChild(el('h2',null,'Transcript quality — how much of the transcript data can be trusted'));
+    s.appendChild(el('div','note','The ASR provably hallucinates: Korean script on Hyderabad calls, '+
+      'voicemail prompts transcribed as the customer, the bot repeating one line dozens of times. '+
+      'Every flag below is computed per call — use the <b>Transcript quality</b> filter above to '+
+      'include or exclude flagged calls from any view on this dashboard.'));
+    s.appendChild(kpiRow(D.tq.kpis));
+    s.appendChild(card('Calls per quality flag (one call can carry several)',
+      hbar(D.tq.flags,{color:'#e34948'})));
+  }
+  if(D.cost&&D.cost.by_outcome){
+    s.appendChild(el('h2',null,'Where the money goes — ₹ by outcome (approx rates, real tokens)'));
+    s.appendChild(el('div','note','<b>'+D.cost.never_connected_pct+'%</b> of spend (₹'+
+      D.cost.never_connected_inr.toLocaleString()+') never reached a human · ₹'+
+      D.cost.voicemail_inr.toLocaleString()+' spent on '+D.cost.voicemail_calls.toLocaleString()+
+      ' answering machines · only <b>'+D.cost.booked_share_pct+'%</b> of spend landed on booking calls'+
+      (D.cost.per_booked?' · <b>₹'+D.cost.per_booked.toLocaleString()+'</b>/booked human':'')+
+      (D.cost.per_attended_alltime?' · <b>₹'+D.cost.per_attended_alltime.toLocaleString()+'</b>/attended visit (all-time)':'')+
+      '. The lever is wasted dials (AMD, attempt-tail suppression, the DROPPED bucket) — not call length.'));
+    s.appendChild(card(null,hbar(D.cost.by_outcome,{unit:' ₹',probe:'outcome'}),esc(D.cost.note)+' · click a bar to filter'));
+  }
+  if(D.audience_hours&&D.audience_hours.series.length){
+    s.appendChild(el('h2',null,'Calling time — RI vs NRI (separate worlds, separate windows)'));
+    const c3=card(null,null);
+    c3.appendChild(legend(D.audience_hours.series));
+    c3.appendChild(vstack(D.audience_hours.hours,D.audience_hours.series,{h:200}));
+    c3.appendChild(el('div','cap',esc(D.audience_hours.src)));
+    s.appendChild(c3);
+  }
+  s.appendChild(el('h2',null,'Token spend per day'));
+  const c2=card(null,null); c2.appendChild(legend(D.tokens.series));
+  c2.appendChild(vstack(D.tokens.dates,D.tokens.series,{h:220})); s.appendChild(c2);
+  s.appendChild(el('h2',null,'Per-call metric table'));
+  s.appendChild(tableEl(D.metrics));
+
+  // ---- REVIEW PANEL (the handwritten sheet, answered live)
+  s=document.getElementById('s-review'); s.innerHTML='';
+  if(D.review){
+    const R=D.review;
+    s.appendChild(el('h2',null,'Review panel — driving the funnel ('+esc(R.from)+' → '+esc(R.to)+')'));
+    s.appendChild(el('div','note',esc(R.note)));
+    const block=(q)=>{
+      const c_=el('div','card');
+      c_.appendChild(el('h3',null,esc(q.q)));
+      c_.appendChild(el('div',null,'<b style="font-size:17px">'+esc(q.a)+'</b>'));
+      if(q.chart) c_.appendChild(vstack(q.chart.labels,
+        [{name:'calls',color:'var(--accent)',values:q.chart.values}],{h:150}));
+      if(q.mix&&q.mix.length) c_.appendChild(hbar(q.mix));
+      if(q.samples&&q.samples.length){
+        const ul=el('div'); q.samples.forEach(x=>ul.appendChild(el('div','cap','• '+esc(x))));
+        c_.appendChild(ul);
+      }
+      if(q.tbl) c_.appendChild(tableEl(q.tbl));
+      if(q.tbl2){ c_.appendChild(el('div','cap','born in range, never dialled:')); c_.appendChild(tableEl(q.tbl2)); }
+      if(q.hint) c_.appendChild(el('div','cap',esc(q.hint)));
+      c_.appendChild(el('div','cap','source: '+esc(q.src)));
+      return c_;
+    };
+    s.appendChild(el('h2',null,'+ve’s'));
+    (R.pos||[]).forEach(q=>s.appendChild(block(q)));
+    s.appendChild(el('h2',null,'−ve’s — who dropped, why, and the recontact chain'));
+    (R.neg||[]).forEach(q=>s.appendChild(block(q)));
+    s.appendChild(el('h2',null,'WA'));
+    (R.wa||[]).forEach(q=>s.appendChild(block(q)));
+    const cm=el('div','note','Call metrics all → the <b>Call metrics</b> tab (latency proxy, durations, depth, tokens, transcript quality).');
+    s.appendChild(cm);
+  }
+  if(D.ops_daily){
+    s.appendChild(el('h2',null,'Daily table — ops format (the screenshot layout)'+
+      '<span class="fixedwin">fixed window — verbatim ops workbook</span>'));
+    s.appendChild(el('div','note',esc(D.ops_daily.note)));
+    s.appendChild(tableEl(D.ops_daily));
+  }
+
+  // ---- ERAS (dedicated sections, no comparison table)
+  s=document.getElementById('s-eras'); s.innerHTML='';
+  if(D.era_sections){
+    s.appendChild(el('h2',null,'Eras — dedicated sections'+
+      '<span class="fixedwin">fixed window — each era is its own full span</span>'));
+    s.appendChild(el('div','note',esc(D.era_sections.note)));
+    ['Kaalbhojaditya','ANGAD'].forEach(era=>{
+      const E=D.era_sections[era]; if(!E) return;
+      s.appendChild(el('h2',null,era+' — '+esc(E.span)));
+      s.appendChild(el('div','kpis',E.kpis.map(k=>
+        `<div class="kpi"><div class="l">${esc(k.label)}</div><div class="v">${esc(k.value)}</div>
+         ${k.sub?`<div class="s">${esc(k.sub)}</div>`:''}<div class="s" style="opacity:.6">${esc(k.src||'')}</div></div>`).join('')));
+      s.appendChild(grid(2,
+        card('Dials per day', vstack(E.daily.labels,
+          [{name:'dials',color:'var(--accent)',values:E.daily.values}],{h:170}),
+          'source: angad.calls'),
+        card('Outcome mix', hbar(E.outcomes,{probe:'outcome'}), 'source: angad.calls.outcome · click a bar to filter')));
+    });
+  }
+
+  // ---- MLID PROFILE (search UI is persistent; results load on demand)
+  initProfileTab();
+
+  // ---- INSIGHTS (role lenses; red strictly = systemic failure)
+  s=document.getElementById('s-insights'); s.innerHTML='';
+  if(D.insights){
+    s.appendChild(el('h2',null,'Insights — by category and importance'));
+    // ONE panel first: the state of the system in four numbers (rule: sparse
+    // overview, drill for depth). Clicking a stat filters the list below.
+    const nF=D.insights.filter(i=>i.severity==='fail').length;
+    const nW=D.insights.filter(i=>i.severity==='warn').length;
+    const nI=D.insights.filter(i=>i.severity==='info').length;
+    const topFail=D.insights.find(i=>i.severity==='fail');
+    const panel=el('div','ipanel');
+    const stat=(n,label,cls,fn)=>{
+      const d=el('div','istat '+(cls||''));
+      d.appendChild(el('div','n',String(n)));
+      d.appendChild(el('div','l',label));
+      d.onclick=fn; panel.appendChild(d);
+    };
+    stat(nF,'Systemic failures','fail',()=>{sel=null;sevFilter='fail';paint();});
+    stat(nW,'Warnings','warn',()=>{sel=null;sevFilter='warn';paint();});
+    stat(nI,'Observations','',()=>{sel=null;sevFilter='info';paint();});
+    stat(D.insights.length,'All insights','',()=>{sel=null;sevFilter=null;paint();});
+    s.appendChild(panel);
+    if(D.prev&&D.prev.baselines){
+      s.appendChild(el('h2',null,'Compared with'));
+      s.appendChild(el('div','note',esc(D.prev.note)));
+      const t={cols:['Baseline','Window','Dials','Days','Dials/day','Connect %','Booked','Booked per 1k'],
+        rows:D.prev.baselines.map(b=>[b.label,b.window,b.dials,b.days,b.dials_per_day,
+          b.connect_pct+'%',b.booked,b.booked_per_1k]),
+        total:D.prev.baselines.length,shown:D.prev.baselines.length};
+      s.appendChild(tableEl(t));
+    }
+    if(topFail) s.appendChild(el('div','note',
+      '<b>Do this first:</b> '+esc(topFail.title)+' — <span class="cap">'+
+      esc(topFail.detail).slice(0,200)+'</span>'));
+    let sevFilter=null;
+    const roles=[...new Set(D.insights.map(i=>i.category))];
+    const bar=el('div','scopes'); let sel=null;
+    const paint=()=>{
+      list.innerHTML='';
+      D.insights.filter(i=>(!sel||i.category===sel)&&(!sevFilter||i.severity===sevFilter)).forEach(i=>{
+        const c_=el('div','insight '+(i.severity||'info'));
+        c_.appendChild(el('div','role',esc(i.category)+' · '+esc(i.importance||'')));
+        c_.appendChild(el('div','t',esc(i.title)));
+        c_.appendChild(el('div','cap',esc(i.detail)));
+        if(i.src) c_.appendChild(el('div','cap','source: '+esc(i.src)));
+        if(i.target){ c_.appendChild(el('div','cap','→ click to open the evidence'));
+          c_.onclick=()=>gotoTab(i.target); }
+        list.appendChild(c_);
+      });
+    };
+    const all=el('button',null,'All categories'); all.classList.add('on');
+    all.onclick=()=>{sel=null;bar.querySelectorAll('button').forEach(x=>x.classList.remove('on'));all.classList.add('on');paint();};
+    bar.appendChild(all);
+    roles.forEach(r=>{
+      const b=el('button',null,esc(r));
+      b.onclick=()=>{sel=r;bar.querySelectorAll('button').forEach(x=>x.classList.remove('on'));b.classList.add('on');paint();};
+      bar.appendChild(b);
+    });
+    s.appendChild(bar);
+    const list=el('div'); s.appendChild(list); paint();
+    if(D.glossary){
+      s.appendChild(el('h2',null,'Unified glossary — one vocabulary for every role'));
+      const g=el('div','card');
+      Object.entries(D.glossary).forEach(([k,v])=>
+        g.appendChild(el('div',null,'<b>'+esc(k)+'</b> — '+esc(v))));
+      s.appendChild(g);
+    }
+  }
+
+  // ---- CIF (Conversation Indicator Framework v1.1)
+  s=document.getElementById('s-cif'); s.innerHTML='';
+  if(D.cif){
+    const C=D.cif;
+    s.appendChild(el('h2',null,'CIF — Conversation Indicator Framework v2'));
+    if(C.v2_note) s.appendChild(el('div','note','<b>What changed:</b> '+esc(C.v2_note)));
+    s.appendChild(el('div','note',esc(C.note)+' <b>'+C.computed_total+' of '+
+      C.indicator_total+'</b> indicators are computed today; the rest need the LLM judge pass.'));
+    s.appendChild(kpiRow(C.headline));
+
+    // CIF v2 (1): corpus provenance — which transcript each score came from
+    if(C.corpora&&C.corpora.length){
+      const g=el('div','ipanel');
+      C.corpora.forEach(x=>{
+        const k=el('div','istat');
+        k.appendChild(el('div','l','Tier '+esc(x.tier)+' · '+esc(x.corpus)));
+        k.appendChild(el('div','n',x.calls.toLocaleString()));
+        k.appendChild(el('div','cap',esc(x.why)));
+        g.appendChild(k);
+      });
+      const k=el('div','istat');
+      k.appendChild(el('div','l','Customer actually spoke'));
+      k.appendChild(el('div','n',C.substantive_pct+'%'));
+      k.appendChild(el('div','cap',C.n_substantive.toLocaleString()+' of '+
+        C.n.toLocaleString()+' — conversation indicators use ONLY these'));
+      g.appendChild(k);
+      s.appendChild(el('h2',null,'Corpus and coverage'));
+      s.appendChild(g);
+    }
+
+    // CIF v2 (3): persona-era segmentation
+    if(C.eras&&C.eras.length){
+      s.appendChild(el('h2',null,'By persona era — pooling these would average different agents'));
+      const t=el('div','tblwrap');
+      t.innerHTML='<table><thead><tr><th>Era</th><th>Calls</th><th>RDI (median words)</th>'+
+        '<th>ACR %</th><th>DSS /7</th><th>EBR in 40-60 band %</th></tr></thead><tbody>'+
+        C.eras.map(e=>'<tr><td>'+esc(e.era)+'</td><td class="num">'+e.calls.toLocaleString()+
+          '</td><td class="num">'+(e.RDI==null?'—':e.RDI)+'</td><td class="num">'+
+          (e.ACR==null?'—':e.ACR)+'</td><td class="num">'+(e.DSS==null?'—':e.DSS)+
+          '</td><td class="num">'+e.EBR_in_band+'</td></tr>').join('')+'</tbody></table>';
+      s.appendChild(t);
+      const names=(C.personas||[]).map(p=>esc(p.name)+' ('+p.calls+')').join(' · ');
+      s.appendChild(el('div','cap','Substantive calls only. Personas the agent named itself in-call: '+
+        (names||'none detected')+'. "undated" = the corpus row carries no call date — '+
+        'call_date is null on 3,853 of 3,862 re-transcript rows, which is a gap in the '+
+        'import, not a property of the calls.'));
+    }
+    // sub-tabs: one per CIF parameter + the two working views
+    const sub=el('div','cifsub'), pane=el('div');
+    const views=[['Overview',()=>{const d=el('div');
+        d.appendChild(card('Exchange Balance Ratio distribution (lead share of words)',
+          hbar(C.ebr_hist),
+          'CIF target band is 40–60%. The mass below 40% is the bot monologuing — '+
+          'the clearest single finding in the framework right now.'));
+        const grid_=el('div','ipanel');
+        C.params.forEach(p=>{
+          const k=el('div','istat');
+          k.appendChild(el('div','l',esc(p.param)));
+          k.appendChild(el('div','n',p.computed+'/'+p.total));
+          k.appendChild(el('div','cap','computed · core metric '+esc(p.core)));
+          k.onclick=()=>{ sub.querySelectorAll('button').forEach(x=>x.classList.remove('on'));
+            [...sub.querySelectorAll('button')].find(x=>x.textContent===p.param).click(); };
+          grid_.appendChild(k);
+        });
+        d.appendChild(el('h2',null,'The six parameters — click one to open its indicators'));
+        d.appendChild(grid_);
+        return d;}],
+      ...C.params.map(p=>[p.param,()=>{
+        const d=el('div');
+        d.appendChild(el('div','note','Core metric: <b>'+esc(p.core)+'</b> · '+
+          p.computed+' of '+p.total+' indicators computed from the clean corpus'));
+        const t=el('div','tblwrap');
+        t.innerHTML='<table><thead><tr><th>Code</th><th>Indicator</th>'+
+          '<th>Target</th><th>Current (median)</th><th>Calls</th><th>Definition (original CIF v1.1)</th>'+
+          '</tr></thead><tbody>'+
+          p.indicators.map(i=>'<tr'+(i.judge?' style="opacity:.6"':'')+'>'+
+            '<td><b>'+esc(i.code)+'</b></td><td>'+esc(i.label)+
+            (i.scoped_to_substantive?' <span class="cap" title="Computed only on calls where the customer actually spoke">◍</span>':'')+
+            '</td>'+
+            '<td>'+esc(i.target)+'</td>'+
+            '<td class="num"><b>'+esc(i.value)+'</b></td>'+
+            '<td class="num">'+(i.n||'—')+'</td>'+
+            '<td style="white-space:normal;max-width:520px;font-size:11.5px;line-height:1.45">'+
+            esc(i.definition)+
+            (i.na_reason?'<div style="margin-top:5px;color:var(--warn)"><b>NA because:</b> '+
+              esc(i.na_reason)+'</div>':'')+
+            '</td></tr>').join('')+'</tbody></table>';
+        d.appendChild(t);
+        d.appendChild(el('div','cap','Every NA now states WHICH problem it is — a judge backlog, '+
+          'an empty upstream column, or too few substantive calls. ◍ marks an indicator computed '+
+          'only on calls where the customer actually spoke. Definitions are verbatim from the CIF '+
+          'scoring dashboard (human-agent variant, 30 indicators / 5 parameters).'));
+        return d;}]),
+      ['Per-call scores',()=>{const d=el('div');
+        d.appendChild(tableEl(C.table));
+        d.appendChild(el('div','cap','Click any MLID to open the lead, then its Conversation tab for the turn-by-turn view.'));
+        return d;}],
+    ];
+    views.forEach(([name,fn],i)=>{
+      const b=el('button',i?'':'on',esc(name));
+      b.onclick=()=>{ sub.querySelectorAll('button').forEach(x=>x.classList.remove('on'));
+        b.classList.add('on'); pane.innerHTML=''; pane.appendChild(fn()); };
+      sub.appendChild(b);
+    });
+    s.appendChild(sub); s.appendChild(pane); pane.appendChild(views[0][1]());
+  } else {
+    s.appendChild(el('div','nacard','No CIF scores yet — run `python cif.py` after importing clean transcriptions.'));
+  }
+
+  // ---- GEOGRAPHY (was a decorative globe; now the numbers it hid)
+  renderGeography();
+
+  // ---- scope chips (Responsive Scopes: simple defaults, one click)
+  renderScopes();
+
+  // ---- LAST: fold the tail of the heaviest sections. This must run AFTER
+  // every section has been built — called earlier it found nothing to fold,
+  // because Positives/Intent/Review had not been rendered yet.
+  discloseHeavySections();
+}
+
+/* ---------------- scope chips ---------------- */
+window.CMP_ON=localStorage.getItem('cmp')==='1';
+function renderScopes(){
+  const sc=document.getElementById('scopes'); if(sc.dataset.built) return;
+  sc.dataset.built='1';
+  const set=(from,to,label)=>{
+    document.getElementById('f_from').value=from||OPT.date_min;
+    document.getElementById('f_to').value=to||OPT.date_max;
+    sc.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.textContent===label));
+    load();
+  };
+  const mk=(label,fn)=>{const b=el('button',null,label);b.onclick=fn;sc.appendChild(b);return b;};
+  // date presets now live in the toolbar; this row keeps the analysis toggles
+  // contract rule 8: comparison is a toggle, not a screen
+  const cmp=mk('Compare to previous period',()=>{
+    window.CMP_ON=!window.CMP_ON; localStorage.setItem('cmp',window.CMP_ON?'1':'0');
+    cmp.classList.toggle('on',window.CMP_ON); render();
+  });
+  cmp.classList.toggle('on',window.CMP_ON);
+  cmp.title='Adds a delta vs the previous equal-length period to the headline KPIs (date-window comparison)';
+  // contract rule 9: saved investigations — name a filter state, pin, reopen
+  const sv=mk('Save this view',()=>{
+    const name=prompt('Name this investigation (filters + dates are saved):'); if(!name)return;
+    const all=JSON.parse(localStorage.getItem('savedViews')||'{}');
+    all[name]=location.hash; localStorage.setItem('savedViews',JSON.stringify(all)); paintSaved();
+  });
+  sv.title='Pins the current filter+date state under a name';
+  const bar=el('span','savebar'); bar.id='savedBar'; sc.appendChild(bar);
+  window.paintSaved=function(){
+    bar.innerHTML='';
+    const all=JSON.parse(localStorage.getItem('savedViews')||'{}');
+    Object.entries(all).forEach(([n,h])=>{
+      const b=el('button',null,esc(n));
+      b.onclick=()=>{ location.hash=h; applyHashState(); load(); };
+      b.oncontextmenu=e=>{ e.preventDefault();
+        if(confirm('Delete saved view "'+n+'"?')){ delete all[n];
+          localStorage.setItem('savedViews',JSON.stringify(all)); paintSaved(); } };
+      b.title='Click to open · right-click to delete';
+      bar.appendChild(b);
+    });
+  };
+  paintSaved();
+}
+
+/* contract rules 4+7: any view reachable by URL alone */
+function syncHash(q){
+  const h=new URLSearchParams(); Object.entries(q).forEach(([k,v])=>{ if(k!=='t'&&v)h.set(k,v); });
+  history.replaceState(null,'','#'+h.toString());
+}
+function applyHashState(){
+  const h=new URLSearchParams(location.hash.slice(1));
+  for(const [k,v] of h){
+    if(k==='from') localStorage.setItem('f_from',v);
+    else if(k==='to') localStorage.setItem('f_to',v);
+    else if(k==='unit') localStorage.setItem('unit',v);
+    else { SEL[k]=new Set(v.split('|')); }
+  }
+  const ff=document.getElementById('f_from'), ft=document.getElementById('f_to');
+  if(ff&&h.get('from')) ff.value=h.get('from');
+  if(ft&&h.get('to')) ft.value=h.get('to');
+  if(typeof buildFilters==='function'&&OPT) buildFilters();
+}
+
+/* contract rule 10: command palette (Ctrl+K) */
+(function(){
+  const pal=()=>document.getElementById('palette');
+  document.addEventListener('keydown',e=>{
+    if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){ e.preventDefault();
+      pal().classList.add('open'); const i=document.getElementById('palInput');
+      i.value=''; i.focus(); drawPal(''); }
+    if(e.key==='Escape'){ pal().classList.remove('open');
+      document.getElementById('lmOverlay').classList.remove('open'); }
+  });
+  window.drawPal=function(q){
+    const list=document.getElementById('palList'); list.innerHTML=''; q=(q||'').trim();
+    const rows=[];
+    if(/^(\d{3,7}|[A-Za-z0-9]+-[A-Za-z]+|LEAD-[0-9a-f]+)$/i.test(q))
+      rows.push({t:'👤 Open lead '+q, fn:()=>openLeadModal(q)});
+    TABS.filter(t=>!q||t[1].toLowerCase().includes(q.toLowerCase()))
+        .forEach(t=>rows.push({t:'⬚ '+t[1]+' tab', fn:()=>gotoTab(t[0])}));
+    [['today','Today'],['7d','Last 7 days'],['era','ANGAD era'],['all','Everything']]
+      .filter(x=>!q||x[0].startsWith(q.toLowerCase()))
+      .forEach(x=>rows.push({t:'📅 Scope: '+x[1],
+        fn:()=>{ document.querySelectorAll('#scopes button').forEach(b=>{ if(b.textContent===x[1]) b.click(); }); }}));
+    rows.slice(0,12).forEach((r,i)=>{
+      const d=el('div','palRow'+(i===0?' on':''),esc(r.t));
+      d.onclick=()=>{ pal().classList.remove('open'); r.fn(); };
+      list.appendChild(d);
+    });
+  };
+  document.addEventListener('DOMContentLoaded',()=>{
+    const i=document.getElementById('palInput');
+    if(!i) return;
+    i.oninput=()=>drawPal(i.value);
+    i.onkeydown=e=>{ if(e.key==='Enter'){ const first=document.querySelector('#palList .palRow');
+      if(first) first.click(); } };
+  });
+})();
+
+/* ---------------- the lead modal (Inncircles layout) ---------------- */
+async function openLeadModal(id){
+  if(!id||id==='NaN'||id==='None') return;
+  const ov=document.getElementById('lmOverlay'); ov.classList.add('open');
+  document.getElementById('lmTitle').textContent='Loading '+id+'…';
+  ['lmSub','lmHead','lmTabs','lmBody'].forEach(x=>document.getElementById(x).innerHTML='');
+  let P;
+  try{ P=await (await fetch('/api/lead?id='+encodeURIComponent(id)+'&t='+TOKEN)).json(); }
+  catch(e){ document.getElementById('lmTitle').textContent='Server unreachable'; return; }
+  if(P.error){ document.getElementById('lmTitle').textContent=id;
+    document.getElementById('lmBody').innerHTML='<div class="note">'+esc(P.error)+'</div>'; return; }
+  const master=(P.masterleadids&&P.masterleadids[0])||(P.mlids&&P.mlids[0])||P.query;
+  document.getElementById('lmTitle').textContent=((P.header.find(h=>h.label==='Project')||{}).value||'')+'  |  MLID - '+master;
+  document.getElementById('lmSub').textContent=
+    (P.lead_refs||[]).join(', ')+(P.lead_ids&&P.lead_ids.length?' · '+P.lead_ids.join(', '):'')+
+    (P.source_lead_ids&&P.source_lead_ids.length?' · source: '+P.source_lead_ids.join(', '):'');
+  const st=P.stage_truth||{};
+  document.getElementById('lmHead').innerHTML=
+    '<div class="kpis">'+(P.header||[]).map(k=>
+      `<div class="kpi"><div class="l">${esc(k.label)}</div><div class="v" style="font-size:16px">${esc(k.value)}</div>
+       <div class="s" style="opacity:.6">${esc(k.src||'')}</div></div>`).join('')+'</div>'+
+    (st.band?('<div class="cap">Funnel band: <b>'+esc(st.band)+'</b> · Zoho: '+esc(st.zoho||'—')+
+      ' · CRM: '+esc(st.crm||'—')+(st.disagree?' · <b style="color:#d99114">systems disagree</b>':'')+
+      ' · audience: '+esc(st.audience)+'</div>'):'');
+  const tabs=[
+    ['Overview',()=>{const d=el('div');
+      d.appendChild(el('h3',null,'Scoring'));
+      if(P.scoring&&P.scoring.length){
+        P.scoring.forEach(f=>{ d.appendChild(el('span','scorepill '+f.colour,esc(f.label)));
+          d.appendChild(el('div','cap',esc(f.why)+' · '+esc(f.src))); });
+      } else d.appendChild(el('div','nacard','No score flags — not qualified, no inbound WhatsApp, low campaign reaction.'));
+      d.appendChild(el('div','cap',esc(P.scoring_src||'')));
+      if(P.wa) d.appendChild(el('div','note','<b>WhatsApp</b>: '+P.wa.outbound+' out / '+P.wa.total+
+        ' total · first '+esc(P.wa.first)+' · last '+esc(P.wa.last)));
+      if(P.audience_split&&P.audience_split.blocks&&P.audience_split.blocks.length){
+        d.appendChild(el('h3',null,'Calling metrics — RI vs NRI (kept separate)'));
+        const t=el('div','tblwrap');
+        t.innerHTML='<table><thead><tr><th>Audience</th><th>Provider</th><th>Dials</th>'+
+          '<th>Picked up</th><th>Pickup %</th><th>Connected</th><th>Booked</th>'+
+          '<th>Median turns</th><th>Median talk (s)</th></tr></thead><tbody>'+
+          P.audience_split.blocks.map(x=>'<tr><td><b>'+esc(x.audience)+'</b></td><td>'+
+            esc(x.provider)+'</td><td class="num">'+x.dials+'</td><td class="num">'+
+            x.picked_up+'</td><td class="num">'+x.pickup_pct+'</td><td class="num">'+
+            x.connected+'</td><td class="num">'+x.booked+'</td><td class="num">'+
+            (x.median_turns==null?'—':x.median_turns)+'</td><td class="num">'+
+            (x.median_talk_s==null?'—':x.median_talk_s)+'</td></tr>').join('')+
+          '</tbody></table>';
+        d.appendChild(t);
+        d.appendChild(el('div','cap',esc(P.audience_split.note)));
+      }
+      if(P.cif){
+        d.appendChild(el('h3',null,'CIF (clean-transcript conversation scores)'));
+        const nn=v=>(v==null?'—':v);
+        d.appendChild(el('div','note','<b>'+P.cif.n+'</b> clean call(s) · Dialogue balance (EBR) <b>'+
+          esc(nn(P.cif.EBR))+'%</b> (target 40–60) · Response depth (RDI) <b>'+esc(nn(P.cif.RDI))+
+          '</b> words · Momentum (CM) <b>'+(P.cif.CM!=null?(+P.cif.CM).toFixed(2):'—')+
+          '</b> · Dead exchanges (DER) <b>'+esc(nn(P.cif.DER))+'%</b> · Decision signal (DSS) <b>'+
+          esc(nn(P.cif.DSS))+'/7</b> · Active contribution (ACR) <b>'+esc(nn(P.cif.ACR))+
+          '%</b><br><span class="cap">'+esc(P.cif.src)+'</span>'));
+      } else {
+        d.appendChild(el('div','nacard','No CIF scores — this lead has no clean-transcribed call yet (scores appear automatically when clean transcriptions cover it).'));
+      }
+      return d;}],
+    ['Call History',()=>P.ledger?wrapT(P.ledger,P.ledger_src):na('No calls on record for this lead.')],
+    ['Conversation',()=>{ const d=el('div');
+      d.appendChild(el('div','cap','loading the calling turns…'));
+      renderTurns(P.lead_refs&&P.lead_refs[0], d);
+      return d;}],
+    ['WhatsApp History',()=>{const d=el('div');
+      if(P.wa) d.appendChild(el('div','note','<b>'+P.wa.outbound+'</b> outbound / <b>'+P.wa.total+
+        '</b> total · first '+esc(P.wa.first)+' · last '+esc(P.wa.last)+' · '+esc(P.wa.src)));
+      if(P.docs) { d.appendChild(el('h3',null,'Documents sent')); d.appendChild(tableEl(P.docs)); }
+      if(!P.wa&&!P.docs) return na('No WhatsApp history in Zoho_Database for this lead.');
+      return d;}],
+    ['Web History',()=>{if(!P.web) return na('No web activity captured — Zoho attribution fields are empty for this lead.');
+      const w=P.web,d=el('div');
+      d.innerHTML='<div class="kpis">'+
+        [['Time on site',(w.time_spent_min!=null?w.time_spent_min+' min':'NA')],
+         ['Page views',(w.page_views!=null?w.page_views:'NA')],
+         ['First page',w.first_page||'NA'],['Last page',w.last_page||'NA'],
+         ['UTM source',w.utm_source||'NA'],['Campaign',w.campaign||'NA']].map(x=>
+          `<div class="kpi"><div class="l">${esc(x[0])}</div><div class="v" style="font-size:15px">${esc(x[1])}</div></div>`).join('')+
+        '</div><div class="cap">source: '+esc(w.src)+'</div>';
+      return d;}],
+    ['Lead History',()=>P.events?wrapT(P.events,P.events_src+' — every transaction, newest first'):na('No lead_events for this lead (pre-Intelligent_CRM lead).')],
+    ['Stage History',()=>{const d=el('div');
+      d.appendChild(el('div','note','Zoho stage: <b>'+esc(st.zoho||'—')+'</b> · Intelligent_CRM stage: <b>'+
+        esc(st.crm||'—')+'</b> · band <b>'+esc(st.band||'—')+'</b>'+
+        (st.disagree?' — <b style="color:#d99114">the systems disagree; trust the event log below</b>':'')));
+      if(P.events) d.appendChild(wrapT(P.events,'stage_change rows are the audit trail'));
+      return d;}],
+    ['Visits & Reminders',()=>{const d=el('div');
+      if(P.visits_zoho){d.appendChild(el('h3',null,'Zoho bookings'));d.appendChild(tableEl(P.visits_zoho));}
+      if(P.visits_crm){d.appendChild(el('h3',null,'Intelligent_CRM visits'));d.appendChild(tableEl(P.visits_crm));}
+      if(P.sched){d.appendChild(el('h3',null,'Scheduled calls / reminders'));d.appendChild(tableEl(P.sched));}
+      if(!P.visits_zoho&&!P.visits_crm&&!P.sched) return na('No visit bookings or scheduled calls for this lead.');
+      return d;}],
+  ];
+  function na(msg){ return el('div','nacard',esc(msg)+' (NA is honest — nothing is invented.)'); }
+  function wrapT(t,cap){ const d=el('div'); d.appendChild(tableEl(t)); if(cap) d.appendChild(el('div','cap',esc(cap))); return d; }
+  const tb=document.getElementById('lmTabs'), body=document.getElementById('lmBody');
+  tb.innerHTML='';
+  tabs.forEach(([name,fn],i)=>{
+    const b=el('button',null,esc(name)); if(!i) b.classList.add('on');
+    b.onclick=()=>{ tb.querySelectorAll('button').forEach(x=>x.classList.remove('on'));
+      b.classList.add('on'); body.innerHTML=''; body.appendChild(fn()); };
+    tb.appendChild(b);
+  });
+  body.innerHTML=''; body.appendChild(tabs[0][1]());
+}
+
+/* ---------------- geography (tables, not decoration) ---------------- */
+function renderGeography(){
+  const s=document.getElementById('s-globe'); s.innerHTML='';
+  const G=D.globe;
+  if(!G){ s.appendChild(el('div','nacard','No geography data.')); return; }
+  s.appendChild(el('h2',null,'Geography — who we call and where they came from'));
+  s.appendChild(kpiRow([
+    {label:'RI humans (India · Plivo)', value:G.ri_calls.toLocaleString(),
+     sub:'domestic calling window applies', src:'ASBLVoiceBot.call_schedules.provider'},
+    {label:'NRI humans (Telnyx)', value:G.nri_calls.toLocaleString(),
+     sub:'IST night = their daytime — read time charts separately',
+     src:'ASBLVoiceBot.call_schedules.provider'},
+  ]));
+  const rows=Object.entries(G.countries||{}).sort((a,b)=>b[1]-a[1]);
+  if(rows.length) s.appendChild(card('Leads by country',
+    hbar(rows.map(([k,v])=>({label:k,value:v}))),
+    'source: cohort workbook country column (the only country data we hold)'));
+  if(G.urls&&G.urls.length) s.appendChild(card('Landing pages that brought these leads',
+    hbar(G.urls),'source: Zoho_Database.leads.first_page_visited'));
+  if(G.sites&&G.sites.length){
+    s.appendChild(el('h2',null,'Project sites'));
+    const t={cols:['Project','Area'],rows:G.sites.map(x=>[x.name,x.area]),
+             total:G.sites.length,shown:G.sites.length};
+    s.appendChild(tableEl(t));
+  }
+  (G.na||[]).forEach(x=>s.appendChild(el('div','nacard','NA · '+esc(x))));
+}
+
+/* ---------------- calling turns (CIF embedded in our layer) ---------------- */
+async function renderTurns(leadRef, host){
+  if(!leadRef){ host.innerHTML='<div class="nacard">No lead reference.</div>'; return; }
+  let T;
+  try{ T=await (await fetch('/api/turns?lead='+encodeURIComponent(leadRef)+'&t='+TOKEN)).json(); }
+  catch(e){ host.innerHTML='<div class="nacard">Server unreachable.</div>'; return; }
+  host.innerHTML='';
+  if(T.error){ host.appendChild(el('div','nacard',esc(T.error))); return; }
+  host.appendChild(el('div','note',esc(T.note)));
+  const pick=el('div','callpick'), body=el('div');
+  const draw=(k)=>{
+    const c=T.calls[k]; body.innerHTML='';
+    pick.querySelectorAll('button').forEach((b,i)=>b.classList.toggle('on',i===k));
+    const meta=el('div','cap','Dialogue balance <b>'+esc(c.DB)+'%</b> (healthy 40–60) · '+
+      c.exchanges+' exchanges · '+esc(c.outcome||'—')+' · '+esc(c.duration_s||'—')+'s · '+
+      esc(c.project||'')+' · corpus: '+esc(c.source_file));
+    body.appendChild(meta);
+    const w=el('div','turnwrap');
+    c.turns.forEach(t=>{
+      const row=el('div','turn '+(t.who==='Agent'?'agent':'cust'));
+      const b=el('div','tbub',esc(t.text));
+      const m=el('div','tmark '+(t.tone||''),(t.at?t.at+' · ':'')+esc(t.mark));
+      row.appendChild(b); row.appendChild(m);
+      w.appendChild(row);
+    });
+    body.appendChild(w);
+  };
+  T.calls.forEach((c,i)=>{
+    const b=el('button',null,'Call '+(i+1)+(c.call_date?' · '+String(c.call_date).slice(0,10):''));
+    b.onclick=()=>draw(i); pick.appendChild(b);
+  });
+  host.appendChild(pick); host.appendChild(body); draw(0);
+}
+
+/* ---------------- globe ---------------- */
+let GLOBE={rot:78,zoom:1,mode:'world'};
+function renderGlobe(){
+  const s=document.getElementById('s-globe'); s.innerHTML='';
+  const G=D.globe; if(!G){ s.appendChild(el('div','cap','No globe data.')); return; }
+  s.appendChild(el('h2',null,'Where the calls go — drag to spin · scroll to zoom · hover for numbers'));
+  s.appendChild(el('div','note','<b>'+G.ri_calls.toLocaleString()+'</b> RI humans (India · Plivo) · <b>'+
+    G.nri_calls.toLocaleString()+'</b> NRI humans (Telnyx). Arcs = Hyderabad → NRI countries from the '+
+    'workbook country data. '+esc(G.src)));
+  const btns=el('div','gbtns');
+  ['world','hyderabad'].forEach(m=>{
+    const b=el('button',null,m==='world'?'🌍 World':'📍 Hyderabad sites');
+    b.onclick=()=>{GLOBE.mode=m;draw();};
+    btns.appendChild(b);
+  });
+  s.appendChild(btns);
+  const cv=document.createElement('canvas'); cv.id='globeC'; cv.width=940; cv.height=560;
+  s.appendChild(cv);
+  const info=el('div','cap',''); s.appendChild(info);
+  (G.na||[]).forEach(x=>s.appendChild(el('div','nacard','NA · '+esc(x))));
+  if(G.urls&&G.urls.length){
+    s.appendChild(el('h2',null,'Major URLs bringing these leads'));
+    s.appendChild(card(null,hbar(G.urls),'source: Zoho_Database.leads.first_page_visited'));
+  }
+  const ctx=cv.getContext('2d');
+  const R=()=>210*GLOBE.zoom, CX=470, CY=280;
+  function proj(lon,lat){
+    const l=(lon-GLOBE.rot)*Math.PI/180, p=lat*Math.PI/180;
+    const x=Math.cos(p)*Math.sin(l), y=Math.sin(p), z=Math.cos(p)*Math.cos(l);
+    return z<-0.15?null:[CX+R()*x, CY-R()*y, z];
+  }
+  let pts=[];
+  function draw(){
+    ctx.clearRect(0,0,940,560); pts=[];
+    if(GLOBE.mode==='hyderabad'){
+      ctx.font='13px sans-serif';
+      (G.sites||[]).forEach((st,i)=>{
+        const x=200+(st.lon-78.3)*4000, y=420-(st.lat-17.38)*4000;
+        ctx.fillStyle='#ffb54d'; ctx.beginPath(); ctx.arc(x,y,9,0,7); ctx.fill();
+        ctx.fillStyle='#dfe6f2'; ctx.fillText(st.name+' · '+st.area,x+14,y+4);
+        pts.push({x,y,tip:st.name+' — '+st.area});
+      });
+      ctx.fillStyle='#8a93a8'; ctx.fillText('Project sites (approx). City-level lead geography: NA in the data.',30,530);
+      return;
+    }
+    ctx.strokeStyle='rgba(120,150,200,.35)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.arc(CX,CY,R(),0,7); ctx.stroke();
+    for(let lat=-60;lat<=60;lat+=30){
+      ctx.beginPath(); let pen=false;
+      for(let lon=-180;lon<=180;lon+=5){
+        const p=proj(lon,lat); if(!p){pen=false;continue;}
+        pen?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]); pen=true;
+      } ctx.stroke();
+    }
+    for(let lon=-180;lon<180;lon+=30){
+      ctx.beginPath(); let pen=false;
+      for(let lat=-85;lat<=85;lat+=5){
+        const p=proj(lon,lat); if(!p){pen=false;continue;}
+        pen?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]); pen=true;
+      } ctx.stroke();
+    }
+    const hyd=proj(G.hyd.lon,G.hyd.lat);
+    if(hyd){
+      ctx.fillStyle='#ffb54d'; ctx.beginPath(); ctx.arc(hyd[0],hyd[1],7,0,7); ctx.fill();
+      ctx.fillStyle='#ffd9a0'; ctx.font='12.5px sans-serif';
+      ctx.fillText('Hyderabad · '+G.ri_calls.toLocaleString()+' RI humans',hyd[0]+11,hyd[1]-6);
+      pts.push({x:hyd[0],y:hyd[1],tip:'Hyderabad — origin · '+G.ri_calls.toLocaleString()+' RI humans (Plivo)'});
+    }
+    (G.arcs||[]).forEach(a=>{
+      const p2=proj(a.lon,a.lat); if(!p2) return;
+      if(hyd){
+        ctx.strokeStyle='rgba(138,92,214,.75)'; ctx.lineWidth=Math.min(4,1+Math.log10(1+a.calls));
+        const mx=(hyd[0]+p2[0])/2, my=(hyd[1]+p2[1])/2-60*GLOBE.zoom;
+        ctx.beginPath(); ctx.moveTo(hyd[0],hyd[1]); ctx.quadraticCurveTo(mx,my,p2[0],p2[1]); ctx.stroke();
+      }
+      ctx.fillStyle='#9f7be8'; ctx.beginPath(); ctx.arc(p2[0],p2[1],4+Math.min(6,Math.log10(1+a.calls)*2),0,7); ctx.fill();
+      ctx.fillStyle='#cdd6e8'; ctx.font='11.5px sans-serif'; ctx.fillText(a.to,p2[0]+8,p2[1]+3);
+      pts.push({x:p2[0],y:p2[1],tip:a.to+' — '+a.calls.toLocaleString()+' leads (workbook country)'});
+    });
+  }
+  cv.onmousemove=e=>{
+    const r=cv.getBoundingClientRect(), sx=cv.width/r.width;
+    const mx=(e.clientX-r.left)*sx, my=(e.clientY-r.top)*sx;
+    if(e.buttons===1){ GLOBE.rot+=e.movementX*0.4; draw(); return; }
+    const hit=pts.find(p=>Math.hypot(p.x-mx,p.y-my)<12);
+    info.textContent=hit?hit.tip:'';
+    cv.style.cursor=hit?'pointer':'grab';
+  };
+  cv.onwheel=e=>{ e.preventDefault();
+    GLOBE.zoom=Math.max(.6,Math.min(2.4,GLOBE.zoom*(e.deltaY<0?1.1:0.9))); draw(); };
+  draw();
+}
+
+/* ---------------- MLID profile ---------------- */
+function initProfileTab(){
+  const s=document.getElementById('s-profile');
+  if(s.dataset.built) return;          // survive re-renders; results stay put
+  s.dataset.built='1';
+  s.appendChild(el('h2',null,'MLID Profile — one human, every transaction'));
+  s.appendChild(el('div','note','Search by <b>Inncircles MASTERLEADID</b> (e.g. 992727), '+
+    '<b>Source Lead ID</b>, registry <b>MLID</b>, <b>lead_id</b> (e.g. 1002-LOFT) or a '+
+    'LEAD-pseudonym. Every table on every tab links here: click any underlined id. '+
+    'Each block names its source collection.'));
+  const bar=el('div','tools');
+  const inp=el('input'); inp.id='profQ'; inp.placeholder='MLID / lead_id / LEAD-ref…';
+  inp.style.minWidth='260px';
+  inp.onkeydown=e=>{ if(e.key==='Enter') loadProfile(inp.value.trim()); };
+  const go=el('button',null,'Open profile'); go.onclick=()=>loadProfile(inp.value.trim());
+  bar.appendChild(inp); bar.appendChild(go);
+  s.appendChild(bar);
+  s.appendChild(el('div',null,'')).id='profOut';
+}
+
+async function loadProfile(id){
+  if(!id) return;
+  const out=document.getElementById('profOut'); out.innerHTML='<div class="cap">loading…</div>';
+  let P;
+  try{ P=await (await fetch('/api/profile?id='+encodeURIComponent(id)+'&t='+TOKEN)).json(); }
+  catch(e){ out.innerHTML='<div class="cap">could not reach the local server</div>'; return; }
+  out.innerHTML='';
+  if(P.error){ out.appendChild(el('div','note',esc(P.error))); return; }
+  const title = P.masterleadids&&P.masterleadids.length ? 'MASTERLEADID '+P.masterleadids.join(', ')
+              : P.mlids&&P.mlids.length ? 'MLID '+P.mlids.join(', ') : P.query;
+  out.appendChild(el('h2',null,'Profile — '+esc(title)));
+  out.appendChild(el('div','cap','pseudonyms: '+esc((P.lead_refs||[]).join(', '))+
+    (P.lead_ids&&P.lead_ids.length?' · lead_ids: '+esc(P.lead_ids.join(', ')):'')+
+    (P.mlids&&P.mlids.length?' · registry MLID: '+esc(P.mlids.join(', ')):'')+
+    (P.masterleadids&&P.masterleadids.length?' · Inncircles MASTERLEADID: '+esc(P.masterleadids.join(', ')):'')+
+    (P.source_lead_ids&&P.source_lead_ids.length?' · Source Lead ID: '+esc(P.source_lead_ids.join(', ')):'')));
+  if(P.header) out.appendChild(el('div','kpis',P.header.map(k=>
+    `<div class="kpi"><div class="l">${esc(k.label)}</div><div class="v">${esc(k.value)}</div>
+     ${k.sub?`<div class="s">${esc(k.sub)}</div>`:''}<div class="s" style="opacity:.6">${esc(k.src||'')}</div></div>`).join('')));
+  const sec=(title,tbl,src)=>{
+    if(!tbl) return;
+    out.appendChild(el('h2',null,title));
+    out.appendChild(tableEl(tbl));
+    if(src) out.appendChild(el('div','cap','source: '+esc(src)));
+  };
+  sec('Call ledger — every call, intents joined per call', P.ledger, P.ledger_src);
+  sec('Scheduled calls — reminders, callbacks', P.sched, P.sched_src);
+  if(P.wa) out.appendChild(el('div','note','<b>WhatsApp</b>: '+P.wa.outbound+' outbound / '+
+    P.wa.total+' total · first '+esc(P.wa.first)+' · last '+esc(P.wa.last)+
+    ' · <span class="cap">source: '+esc(P.wa.src)+'</span>'));
+  sec('Documents sent', P.docs, P.docs_src);
+  sec('Site visits (Zoho bookings)', P.visits_zoho, P.visits_zoho_src);
+  sec('Site visits (Intelligent_CRM)', P.visits_crm, P.visits_crm_src);
+  sec('Stage timeline — lead events', P.events, P.events_src);
+}
+
+/* ---------------- io ---------------- */
+async function load(){
+  const q=currentQuery();
+  syncHash(q);                       // contract rule 4: every view has a URL
+  const sub=document.getElementById('sub');
+  sub.textContent='loading\u2026';
+  const mySeq=++loadSeq;              // B1 fix: only the newest request may render
+  let j;
+  try{
+    j=await (await fetch('/api/data?'+new URLSearchParams(q))).json();
+  }catch(err){
+    if(mySeq===loadSeq)
+      sub.textContent='could not reach the local server \u2014 is dashboard.py still running?';
+    return;
+  }
+  if(mySeq!==loadSeq) return;         // a newer request superseded this one
+  if(j.error){ sub.textContent='error: '+j.error; return; }
+  if(j.empty){
+    sub.innerHTML='No local cache. Click <b>Fetch fresh data from Mongo</b>, '+
+      'or run <code>python sync.py --full</code>.';
+    return;
+  }
+  if(j.options) OPT=j.options;
+  if(j.pii) applyPiiState(j.pii);
+
+  if(j.no_rows){
+    const bits=Object.entries(j.applied||{}).map(([k,v])=>
+      '<b>'+esc(k)+'</b> = '+esc(String(v).split('|').join(', ')));
+    sub.textContent='0 of '+(j.total_calls||0).toLocaleString()+' calls match the current filters.';
+    document.getElementById('kpis').innerHTML='';
+    document.querySelectorAll('section').forEach(x=>x.innerHTML='');
+    // the Leads tab builds itself once and is guarded by dataset.built —
+    // clearing its HTML without clearing the guard left it blank forever
+    document.getElementById('s-profile').removeAttribute('data-built');
+    const box=document.getElementById('s-'+(localStorage.getItem('tab')||'numbers'))
+              ||document.getElementById('s-numbers');
+    const card=el('div','card');
+    card.appendChild(el('h3',null,'Nothing matches these filters'));
+    card.appendChild(el('div','cap','The cache holds '+(j.total_calls||0).toLocaleString()+
+      ' calls. Your current selection excludes all of them:'));
+    card.appendChild(el('div','cap','<br>'+(bits.length?bits.join('<br>'):'date range '+
+      esc(j.meta.from)+' \u2192 '+esc(j.meta.to))));
+    const b=el('button','primary','Reset all filters');
+    b.style.marginTop='12px';
+    b.onclick=()=>{ Object.keys(SEL).forEach(k=>SEL[k].clear());
+      localStorage.removeItem('f_from'); localStorage.removeItem('f_to');
+      localStorage.removeItem('f_searchval'); buildFilters(); load(); };
+    card.appendChild(b);
+    box.classList.add('on'); box.appendChild(card);
+    return;
+  }
+  D=j; render();
+}
+
+function applyPiiState(p){
+  const wrap=document.getElementById('piiWrap');
+  const badge=document.getElementById('piiBadge');
+  if(!wrap) return;
+  wrap.style.display = p.available ? '' : 'none';
+  const t=document.getElementById('piiToggle');
+  if(t&&!t._wired){
+    t._wired=true;
+    t.checked = localStorage.getItem('pii')==='1';
+    t.onchange=()=>{ localStorage.setItem('pii', t.checked?'1':'0'); load(); };
+  }
+  const on = t && t.checked;
+  badge.textContent = on ? 'local only \u00b7 127.0.0.1 \u00b7 SHOWING PHONE NUMBERS'
+                         : 'local only \u00b7 127.0.0.1 \u00b7 no PII';
+  badge.style.borderColor = on ? '#eb6834' : '';
+  badge.style.color = on ? '#eb6834' : '';
+}
+
+document.getElementById('refresh').onclick=async()=>{
+  if(!confirm('Pull fresh data from MongoDB now?\n\nThis re-reads all four databases '+
+              '(read-only) and can take 10-20 minutes. The dashboard keeps working '+
+              'on the current cache until it finishes.')) return;
+  document.getElementById('busy').style.display='flex';
+  document.getElementById('busyTitle').textContent='Fetching from MongoDB…';
+  await fetch('/api/refresh?full=1&t='+TOKEN); // incremental sync has the stale-watermark bug: it pulls nothing
+  let pollFails=0;
+  const poll=setInterval(async()=>{
+    let s;
+    try{ s=await (await fetch('/api/status?t='+TOKEN)).json(); }
+    catch(e){                              // B4 fix: server unreachable
+      if(++pollFails>=4){ clearInterval(poll);
+        document.getElementById('busyTitle').textContent=
+          'Lost contact with the local server \u2014 restart dashboard.py';
+      }
+      return;
+    }
+    pollFails=0;
+    document.getElementById('busyLog').textContent=s.log||'working…';
+    if(!s.running){
+      clearInterval(poll);
+      document.getElementById('busyTitle').textContent='Done — reloading';
+      setTimeout(async()=>{
+        document.getElementById('busy').style.display='none';
+        try{                              // B7 fix: options may have changed
+          const oj=await (await fetch('/api/options?t='+TOKEN)).json();
+          if(oj.options){ OPT=oj.options; buildFilters(); }
+        }catch(e){}
+        load();
+      },900);
+    }
+  },2500);
+};
+
+(async()=>{
+  // Fetch options first and build the filter controls, THEN load data using
+  // those controls. Loading data before the controls exist made the first
+  // paint ignore the saved date range - the page showed one range while the
+  // date boxes showed another.
+  let j;
+  try{
+    j=await (await fetch('/api/options?t='+TOKEN)).json();
+  }catch(err){
+    document.getElementById('sub').textContent=
+      'could not reach the local server on this port.';
+    return;
+  }
+  if(j.empty){
+    document.getElementById('sub').innerHTML=
+      'No local cache yet. Click <b>Fetch fresh data from Mongo</b> above, '+
+      'or run <code>python sync.py --full</code> in the terminal.';
+    return;
+  }
+  OPT=j.options;
+  if(j.pii) applyPiiState(j.pii);
+  const us=document.getElementById('unitSel');
+  us.value=localStorage.getItem('unit')||'calls';
+  us.onchange=()=>{localStorage.setItem('unit',us.value); load();};
+  buildFilters();
+  buildPresets();
+  // filters open in a modal (Inncircles pattern); dates stay on the toolbar
+  const fModal=document.getElementById('filterModal');
+  document.getElementById('fhToggle').onclick=()=>fModal.classList.add('open');
+  fModal.onclick=e=>{ if(e.target===fModal) fModal.classList.remove('open'); };
+  document.getElementById('fhReset').onclick=()=>{
+    Object.keys(SEL).forEach(k=>SEL[k]&&SEL[k].clear());
+    const t=document.getElementById('f_search'); if(t)t.value='';
+    localStorage.removeItem('f_searchval');
+    ['born_from','born_to'].forEach(k=>{ const e=document.getElementById('f_'+k);
+      if(e){ e.value=''; localStorage.removeItem('f_'+k); } });
+    buildFilters(); renderChips(); load();
+  };
+  // sidebar collapse
+  const app=document.getElementById('app'), st=document.getElementById('sideToggle');
+  if(localStorage.getItem('sideCollapsed')==='1') app.classList.add('collapsed');
+  st.onclick=()=>{ app.classList.toggle('collapsed');
+    localStorage.setItem('sideCollapsed', app.classList.contains('collapsed')?'1':'0');
+    st.textContent = app.classList.contains('collapsed') ? '⟩' : '⟨ Collapse'; };
+  if(app.classList.contains('collapsed')) st.textContent='⟩';
+  // top-bar id search → opens the lead directly
+  const aud=document.getElementById('audSel');
+  aud.value=localStorage.getItem('aud')||'';
+  aud.onchange=()=>{ localStorage.setItem('aud',aud.value);
+    SEL['audience']=aud.value?new Set([aud.value]):new Set();
+    buildFilters(); renderChips(); load(); };
+  if(aud.value) SEL['audience']=new Set([aud.value]);
+  const ids=document.getElementById('idSearch');
+  ids.onkeydown=e=>{ if(e.key==='Enter'&&ids.value.trim()) openLeadModal(ids.value.trim()); };
+  renderChips();
+  if(location.hash.length>1) applyHashState();   // URL state wins (rule 4)
+  load();
+})();
+</script>

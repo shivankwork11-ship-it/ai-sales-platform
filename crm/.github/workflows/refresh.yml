@@ -1,0 +1,32 @@
+name: Refresh Lead Profiles
+
+on:
+  # Hourly schedule removed: ongoing refresh now runs on Vercel Cron
+  # (/api/cron/refresh — incremental + batched, every 10 min). The old hourly
+  # full recompute here kept getting CANCELLED at the 20-min cap and never
+  # finished, which is why lead_profiles went stale. This workflow is kept for
+  # MANUAL full recomputes / backfills only.
+  workflow_dispatch:          # manual trigger (GitHub UI or `gh workflow run`)
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90        # full recompute (~587 leads, N+1) needs >20m; 20m cancelled every run
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install pymongo dnspython
+
+      - name: Run compute script
+        env:
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+        run: python compute_lead_profiles.py

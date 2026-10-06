@@ -1,0 +1,22 @@
+# Render Blueprint: always-on worker that refreshes analytics_db.lead_profiles.
+# The Vercel deployment still serves the dashboard UI; this only does the writes.
+services:
+  - type: web            # free tier only offers web services (hence worker.py binds a port)
+    name: asbl-lead-refresh
+    runtime: python
+    plan: free
+    # Render skipped requirements.txt ("empty build command") → install it explicitly.
+    # Full set now: the worker imports dashboard.py (needs flask/openpyxl/etc.).
+    buildCommand: pip install -r requirements.txt
+    startCommand: python worker.py
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: "1"         # stream print() to Render logs live (else buffered/hidden)
+      - key: PYTHON_VERSION
+        value: "3.11.9"    # pin (Render defaulted to 3.14; match the proven GH runtime)
+      - key: MONGO_URI
+        sync: false        # set this in the Render dashboard (same value as Vercel)
+      - key: CRON_SECRET
+        sync: false        # REQUIRED: shared secret auth for /api/cron/refresh (fail-closed if unset)
+      - key: REFRESH_INTERVAL_SEC
+        value: "1200"

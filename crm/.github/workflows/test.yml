@@ -1,0 +1,20 @@
+# Runs the pytest suite on every push/PR. NOTE: GitHub Actions is currently
+# billing-blocked for this account (see external_action_items) — this gate will
+# start enforcing automatically once billing is restored. Until then, run locally:
+#   pip install -r requirements-dev.txt && python -m pytest
+name: Tests
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - run: python -m pytest

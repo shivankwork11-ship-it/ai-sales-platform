@@ -1,0 +1,44 @@
+diff --git a/agent/src/sitevisit/schedule-on-presite.ts b/agent/src/sitevisit/schedule-on-presite.ts
+index f877d1b..0c891dd 100644
+--- a/agent/src/sitevisit/schedule-on-presite.ts
++++ b/agent/src/sitevisit/schedule-on-presite.ts
+@@ -30,7 +30,30 @@ export async function scheduleSiteVisitCallsForCall(callDocId: string): Promise<
+ 
+     const visitAt = parseVisitDateTime(req?.date, req?.slot);
+     const preSiteAt = call.endedAt ? new Date(call.endedAt) : new Date();
+-    const planned = planSiteVisitCalls({ preSiteAt, visitAt });
++    let planned = planSiteVisitCalls({ preSiteAt, visitAt });
++
++    // THE 89% FIX. When the visit time could not be parsed, the old behaviour
++    // was to schedule NOTHING, silently — measured Jul 17–Aug 5, 157 of 176
++    // bookings (89%) got zero reminders this way, and booked→attended sits at
++    // 24%. A booking with an unknown time still deserves contact: schedule ONE
++    // reminder next morning 10:00 IST to confirm the visit details. The
++    // reminder prompt sees metadata.visit_time_unparsed and can ask for the
++    // exact time, which back-fills visitAt for the normal 12h/1h plan.
++    let visitTimeUnparsed = false;
++    if (visitAt == null) {
++      visitTimeUnparsed = true;
++      const nextMorning = new Date(preSiteAt);
++      nextMorning.setUTCDate(nextMorning.getUTCDate() + 1);
++      nextMorning.setUTCHours(4, 30, 0, 0); // 10:00 IST
++      planned = [{
++        slug: 'site_visit_reminder',
++        dueAt: nextMorning,
++        label: 'visit time unknown — next-morning confirm of details',
++      }];
++      console.warn(`[sitevisit] PRE_SITE call ${callDocId}: visit time unparseable ` +
++        `(date=${JSON.stringify(req?.date ?? null)} slot=${JSON.stringify(req?.slot ?? null)}) — ` +
++        `scheduling next-morning confirm instead of nothing`);
++    }
+ 
+     if (planned.length === 0) {
+       console.log(`[sitevisit] PRE_SITE call ${callDocId}: nothing to schedule (visit past/imminent)`);
+@@ -52,6 +75,7 @@ export async function scheduleSiteVisitCallsForCall(callDocId: string): Promise<
+       project,
+       visit_date: req?.date ?? '',
+       visit_slot: req?.slot ?? '',
++      visit_time_unparsed: visitTimeUnparsed,
+       venue: (meta.venue as string) ?? '',
+       party_size: meta.party_size ?? 1,
+       visit_notes: (meta.visit_notes as string) ?? '',

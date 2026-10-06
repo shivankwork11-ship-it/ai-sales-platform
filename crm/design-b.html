@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Design B — Luxury Editorial</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #F4EFE6;
+    --bg-2: #EDE7DC;
+    --bg-card: #FDFAF5;
+    --border: #D9D2C5;
+    --border-dark: #C4BAA8;
+    --ink: #1C1814;
+    --ink-2: #3D3630;
+    --ink-dim: #8A7F72;
+    --ink-muted: #B8AFA3;
+    --gold: #9A7B3E;
+    --gold-light: #C9A96A;
+    --gold-bg: rgba(154,123,62,0.08);
+    --green: #2E7D52;
+    --red: #8B2635;
+    --amber: #9A6B1E;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Subtle paper texture */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.4;
+  }
+
+  /* ── TOPBAR ── */
+  .topbar {
+    display: flex;
+    align-items: center;
+    padding: 0 40px;
+    height: 56px;
+    border-bottom: 1px solid var(--border-dark);
+    background: var(--bg-card);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .brand {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+
+  .brand-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 22px;
+    font-weight: 500;
+    color: var(--ink);
+    letter-spacing: 0.08em;
+  }
+
+  .brand-rule {
+    width: 1px;
+    height: 16px;
+    background: var(--border-dark);
+    align-self: center;
+  }
+
+  .brand-sub {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.2em;
+    color: var(--ink-dim);
+    text-transform: uppercase;
+  }
+
+  .topbar-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .btn-ghost {
+    padding: 7px 18px;
+    background: none;
+    border: 1px solid var(--border-dark);
+    color: var(--ink-2);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-radius: 2px;
+  }
+  .btn-ghost:hover { background: var(--bg-2); }
+
+  .btn-gold {
+    padding: 7px 20px;
+    background: var(--ink);
+    border: 1px solid var(--ink);
+    color: var(--bg);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-radius: 2px;
+  }
+  .btn-gold:hover { background: var(--ink-2); }
+
+  .updated-tag {
+    font-size: 10px;
+    color: var(--ink-muted);
+    letter-spacing: 0.05em;
+    border-left: 1px solid var(--border);
+    padding-left: 16px;
+    margin-left: 8px;
+  }
+
+  /* ── HERO STATS ── */
+  .hero-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    border-bottom: 1px solid var(--border-dark);
+    background: var(--bg-card);
+  }
+
+  .hero-stat {
+    padding: 28px 40px;
+    border-right: 1px solid var(--border);
+    position: relative;
+    animation: riseIn 0.5s ease both;
+  }
+
+  .hero-stat::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 40px;
+    right: 40px;
+    height: 2px;
+    background: linear-gradient(90deg, var(--gold), transparent);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .hero-stat:hover::before { opacity: 1; }
+
+  .hero-stat-num {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 52px;
+    font-weight: 300;
+    color: var(--ink);
+    line-height: 1;
+    letter-spacing: -0.02em;
+  }
+
+  .hero-stat-label {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.2em;
+    color: var(--ink-dim);
+    text-transform: uppercase;
+    margin-top: 6px;
+  }
+
+  .hero-stat-change {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    color: var(--green);
+    margin-top: 4px;
+  }
+
+  /* ── MAIN LAYOUT ── */
+  .main {
+    display: grid;
+    grid-template-columns: 1fr 280px;
+    min-height: calc(100vh - 130px);
+  }
+
+  /* ── TABLE SECTION ── */
+  .table-section {
+    padding: 0;
+    border-right: 1px solid var(--border);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .section-bar {
+    display: flex;
+    align-items: center;
+    padding: 14px 40px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-card);
+    gap: 20px;
+  }
+
+  .section-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 16px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    color: var(--ink);
+  }
+
+  .section-count {
+    font-size: 10px;
+    color: var(--ink-muted);
+    letter-spacing: 0.08em;
+    margin-left: auto;
+  }
+
+  .search-field {
+    display: flex;
+    align-items: center;
+    padding: 10px 40px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+    gap: 10px;
+  }
+
+  .search-field input {
+    flex: 1;
+    background: none;
+    border: none;
+    outline: none;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    color: var(--ink);
+    letter-spacing: 0.02em;
+  }
+
+  .search-field input::placeholder { color: var(--ink-muted); }
+
+  .table-wrap { overflow-y: auto; flex: 1; }
+
+  .table-wrap::-webkit-scrollbar { width: 4px; }
+  .table-wrap::-webkit-scrollbar-thumb { background: var(--border-dark); border-radius: 2px; }
+
+  table { width: 100%; border-collapse: collapse; }
+
+  thead th {
+    padding: 10px 16px 10px 40px;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+    text-align: left;
+    background: var(--bg-2);
+    border-bottom: 1px solid var(--border-dark);
+    position: sticky;
+    top: 0;
+  }
+
+  thead th:not(:first-child) { padding-left: 12px; }
+
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  tbody tr:hover { background: var(--bg-card); }
+  tbody tr.sel { background: var(--gold-bg); }
+
+  td {
+    padding: 11px 12px;
+    font-size: 12px;
+  }
+
+  td:first-child { padding-left: 40px; }
+
+  .td-name {
+    font-weight: 500;
+    color: var(--ink);
+    font-size: 13px;
+  }
+
+  .td-phone {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--ink-dim);
+  }
+
+  .tag {
+    display: inline-block;
+    padding: 2px 8px;
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    border-radius: 1px;
+  }
+
+  .tag-source { background: var(--bg-2); color: var(--gold); border: 1px solid var(--gold-light); }
+
+  .pill {
+    display: inline-block;
+    padding: 2px 10px;
+    font-size: 10px;
+    font-weight: 500;
+    border-radius: 100px;
+    letter-spacing: 0.02em;
+  }
+
+  .pill-green { background: rgba(46,125,82,0.1); color: var(--green); }
+  .pill-red { background: rgba(139,38,53,0.1); color: var(--red); }
+  .pill-amber { background: rgba(154,107,30,0.1); color: var(--amber); }
+  .pill-muted { color: var(--ink-muted); font-style: italic; }
+
+  .num-col { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--ink-2); }
+  .num-dim { color: var(--ink-muted); }
+
+  /* ── SIDE PANEL ── */
+  .side {
+    background: var(--bg-card);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .side-head {
+    padding: 14px 24px;
+    border-bottom: 1px solid var(--border);
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--ink);
+    letter-spacing: 0.04em;
+  }
+
+  .kpi-list { padding: 8px 0; border-bottom: 1px solid var(--border); }
+
+  .kpi-row {
+    display: flex;
+    align-items: center;
+    padding: 10px 24px;
+    gap: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .kpi-row:last-child { border-bottom: none; }
+
+  .kpi-icon {
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--border-dark);
+    background: var(--bg-2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    flex-shrink: 0;
+    border-radius: 2px;
+  }
+
+  .kpi-body { flex: 1; }
+
+  .kpi-label {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    color: var(--ink-dim);
+    text-transform: uppercase;
+  }
+
+  .kpi-val {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 20px;
+    font-weight: 500;
+    color: var(--ink);
+    line-height: 1.2;
+  }
+
+  .kpi-bar-wrap { padding: 0 24px 20px; }
+
+  .kpi-bar-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: var(--ink-muted);
+    letter-spacing: 0.08em;
+    margin-bottom: 5px;
+    text-transform: uppercase;
+  }
+
+  .kpi-bar {
+    height: 2px;
+    background: var(--border);
+    margin-bottom: 12px;
+    overflow: hidden;
+  }
+
+  .kpi-bar-inner {
+    height: 100%;
+    background: var(--gold);
+    transition: width 1.5s ease;
+  }
+
+  .kpi-bar-inner.v2 { background: var(--green); }
+  .kpi-bar-inner.v3 { background: var(--ink-2); }
+
+  .divider-label {
+    padding: 10px 24px;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+  }
+
+  .log-list { overflow-y: auto; flex: 1; }
+  .log-list::-webkit-scrollbar { width: 3px; }
+  .log-list::-webkit-scrollbar-thumb { background: var(--border); }
+
+  .log-item {
+    padding: 10px 24px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .log-item:hover { background: var(--bg); }
+
+  .log-name {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ink);
+    margin-bottom: 2px;
+  }
+
+  .log-desc {
+    font-size: 10px;
+    color: var(--ink-dim);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .log-dot {
+    display: inline-block;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+
+  .dot-g { background: var(--green); }
+  .dot-r { background: var(--red); }
+  .dot-a { background: var(--amber); }
+
+  @keyframes riseIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: none; }
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-name">ASBL</span>
+    <div class="brand-rule"></div>
+    <span class="brand-sub">Lead Intelligence</span>
+  </div>
+  <div class="topbar-right">
+    <span class="updated-tag">Updated 11:41 am</span>
+    <button class="btn-ghost">↺ Refresh</button>
+    <button class="btn-gold">↓ Download Excel</button>
+  </div>
+</header>
+
+<div class="hero-stats">
+  <div class="hero-stat" style="animation-delay:0s">
+    <div class="hero-stat-num">446</div>
+    <div class="hero-stat-label">Total Leads</div>
+    <div class="hero-stat-change">↑ 12 this week</div>
+  </div>
+  <div class="hero-stat" style="animation-delay:0.08s">
+    <div class="hero-stat-num">446</div>
+    <div class="hero-stat-label">Website Active</div>
+  </div>
+  <div class="hero-stat" style="animation-delay:0.16s">
+    <div class="hero-stat-num" style="color:var(--green)">112</div>
+    <div class="hero-stat-label">WhatsApp</div>
+  </div>
+  <div class="hero-stat" style="animation-delay:0.24s">
+    <div class="hero-stat-num" style="color:var(--amber)">93</div>
+    <div class="hero-stat-label">Calls Answered</div>
+  </div>
+</div>
+
+<div class="main">
+  <div class="table-section">
+    <div class="section-bar">
+      <span class="section-title">Lead Registry</span>
+      <span class="section-count">446 records · sorted by latest</span>
+    </div>
+    <div class="search-field">
+      <span style="color:var(--ink-muted);font-size:12px;">⌕</span>
+      <input type="text" placeholder="Search by name, phone, source, campaign…">
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Phone</th>
+            <th>Source</th>
+            <th>Campaign</th>
+            <th>Lead Since</th>
+            <th>Web</th>
+            <th>CTA</th>
+            <th>WA</th>
+            <th>Calls</th>
+            <th>Pickup</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="sel">
+            <td class="td-name">Rajesh Kumar</td>
+            <td class="td-phone">+91 98765 43210</td>
+            <td><span class="tag tag-source">FIM</span></td>
+            <td><span style="font-size:11px;color:var(--ink-dim)">loft-c2_lead</span></td>
+            <td style="font-family:'DM Mono',monospace;font-size:10px;color:var(--ink-dim)">24 May 2026</td>
+            <td class="num-col">8</td>
+            <td class="num-col">3</td>
+            <td class="num-col">5</td>
+            <td class="num-col">2<span class="num-dim">/3</span></td>
+            <td><span class="pill pill-green">67%</span></td>
+          </tr>
+          <tr>
+            <td class="td-name">Priya Sharma</td>
+            <td class="td-phone">+91 87654 32109</td>
+            <td><span class="tag tag-source">Google</span></td>
+            <td><span style="font-size:11px;color:var(--ink-dim)">loft-awareness</span></td>
+            <td style="font-family:'DM Mono',monospace;font-size:10px;color:var(--ink-dim)">23 May 2026</td>
+            <td class="num-col">12</td>
+            <td class="num-col">5</td>
+            <td class="num-col">0</td>
+            <td class="num-col">1<span class="num-dim">/2</span></td>
+            <td><span class="pill pill-amber">50%</span></td>
+          </tr>
+          <tr>
+            <td class="td-name">Swathi</td>
+            <td class="td-phone">+91 93903 29071</td>
+            <td><span class="tag tag-source">FIM</span></td>
+            <td><span style="font-size:11px;color:var(--ink-dim)">loft-c2_lead</span></td>
+            <td style="font-family:'DM Mono',monospace;font-size:10px;color:var(--ink-dim)">24 May 2026</td>
+            <td class="num-col">2</td>
+            <td class="num-col">0</td>
+            <td class="num-col">0</td>
+            <td class="num-col">0<span class="num-dim">/1</span></td>
+            <td><span class="pill pill-red">0%</span></td>
+          </tr>
+          <tr>
+            <td class="td-name">Banoth Tharun</td>
+            <td class="td-phone">+91 90322 56946</td>
+            <td><span class="tag tag-source">FIM</span></td>
+            <td><span style="font-size:11px;color:var(--ink-dim)">loft-c2_lead</span></td>
+            <td style="font-family:'DM Mono',monospace;font-size:10px;color:var(--ink-dim)">24 May 2026</td>
+            <td class="num-col">4</td>
+            <td class="num-col">3</td>
+            <td class="num-col">2</td>
+            <td class="num-col">2<span class="num-dim">/2</span></td>
+            <td><span class="pill pill-green">100%</span></td>
+          </tr>
+          <tr>
+            <td class="td-name">Arjun Mehta</td>
+            <td class="td-phone">+91 94567 12345</td>
+            <td><span class="tag tag-source">Meta</span></td>
+            <td><span style="font-size:11px;color:var(--ink-dim)">broadway-q2</span></td>
+            <td style="font-family:'DM Mono',monospace;font-size:10px;color:var(--ink-dim)">22 May 2026</td>
+            <td class="num-col">6</td>
+            <td class="num-col">2</td>
+            <td class="num-col">8</td>
+            <td class="num-col num-dim">—</td>
+            <td><span class="pill-muted">N/A</span></td>
+          </tr>
+          <tr>
+            <td class="td-name">Sunita Reddy</td>
+            <td class="td-phone">+91 77654 99123</td>
+            <td><span class="tag tag-source">FIM</span></td>
+            <td><span style="font-size:11px;color:var(--ink-dim)">loft-retarget</span></td>
+            <td style="font-family:'DM Mono',monospace;font-size:10px;color:var(--ink-dim)">21 May 2026</td>
+            <td class="num-col">18</td>
+            <td class="num-col">7</td>
+            <td class="num-col">3</td>
+            <td class="num-col">3<span class="num-dim">/4</span></td>
+            <td><span class="pill pill-green">75%</span></td>
+          </tr>
+          <tr>
+            <td class="td-name">Nikhil Verma</td>
+            <td class="td-phone">+91 86030 07289</td>
+            <td><span class="tag tag-source">Google</span></td>
+            <td><span style="font-size:11px;color:var(--ink-dim)">loft-search</span></td>
+            <td style="font-family:'DM Mono',monospace;font-size:10px;color:var(--ink-dim)">19 May 2026</td>
+            <td class="num-col">24</td>
+            <td class="num-col">9</td>
+            <td class="num-col">12</td>
+            <td class="num-col">4<span class="num-dim">/5</span></td>
+            <td><span class="pill pill-green">80%</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="side">
+    <div class="side-head">Performance Overview</div>
+    <div class="kpi-list">
+      <div class="kpi-row">
+        <div class="kpi-icon">⬡</div>
+        <div class="kpi-body">
+          <div class="kpi-label">Web Messages</div>
+          <div class="kpi-val">3,842</div>
+        </div>
+      </div>
+      <div class="kpi-row">
+        <div class="kpi-icon">✉</div>
+        <div class="kpi-body">
+          <div class="kpi-label">WhatsApp Msgs</div>
+          <div class="kpi-val">891</div>
+        </div>
+      </div>
+      <div class="kpi-row">
+        <div class="kpi-icon">◎</div>
+        <div class="kpi-body">
+          <div class="kpi-label">Call Minutes</div>
+          <div class="kpi-val">342</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="kpi-bar-wrap" style="padding-top:16px;">
+      <div class="kpi-bar-label"><span>Website</span><span>100%</span></div>
+      <div class="kpi-bar"><div class="kpi-bar-inner" style="width:100%"></div></div>
+      <div class="kpi-bar-label"><span>WhatsApp</span><span>25.1%</span></div>
+      <div class="kpi-bar"><div class="kpi-bar-inner v2" style="width:25.1%"></div></div>
+      <div class="kpi-bar-label"><span>Call Pickup</span><span>21.1%</span></div>
+      <div class="kpi-bar"><div class="kpi-bar-inner v3" style="width:21.1%"></div></div>
+    </div>
+
+    <div class="divider-label">Recent Activity</div>
+    <div class="log-list">
+      <div class="log-item"><div class="log-name"><span class="log-dot dot-g"></span>Rajesh Kumar</div><div class="log-desc"><span>Call answered · 3m 12s</span><span>11:38</span></div></div>
+      <div class="log-item"><div class="log-name"><span class="log-dot dot-a"></span>Priya Sharma</div><div class="log-desc"><span>WA message · depth 5</span><span>11:35</span></div></div>
+      <div class="log-item"><div class="log-name"><span class="log-dot dot-r"></span>Swathi</div><div class="log-desc"><span>Call not answered</span><span>11:32</span></div></div>
+      <div class="log-item"><div class="log-name"><span class="log-dot dot-g"></span>Banoth Tharun</div><div class="log-desc"><span>CTA triggered · 3×</span><span>11:28</span></div></div>
+      <div class="log-item"><div class="log-name"><span class="log-dot dot-g"></span>Sunita Reddy</div><div class="log-desc"><span>Call answered · 5m 41s</span><span>11:21</span></div></div>
+      <div class="log-item"><div class="log-name"><span class="log-dot dot-a"></span>Nikhil Verma</div><div class="log-desc"><span>Web chat · 24 messages</span><span>11:18</span></div></div>
+      <div class="log-item"><div class="log-name"><span class="log-dot dot-r"></span>Kiran Patel</div><div class="log-desc"><span>Call not answered</span><span>11:14</span></div></div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

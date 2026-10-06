@@ -1,0 +1,22 @@
+# Keep the build context small and the image free of the large Parquet cache
+# (regenerated at runtime) and local dev artifacts.
+.git
+.gitignore
+.vercel
+.venv
+venv
+**/__pycache__
+*.pyc
+*.pyo
+
+# ANGAD runtime cache / old data / secrets — never ship these in the image.
+angad_app/data/
+angad_app/data_OLD_CLUSTER_*/
+**/*.parquet
+angad_app/.env
+angad_app/RELEASES/*.jsonl
+angad_app/RELEASES/daily/
+
+.DS_Store
+.idea/
+.vscode/

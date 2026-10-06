@@ -1,0 +1,77 @@
+diff --git a/agent/src/sitevisit/planner.ts b/agent/src/sitevisit/planner.ts
+index 040d445..460a207 100644
+--- a/agent/src/sitevisit/planner.ts
++++ b/agent/src/sitevisit/planner.ts
+@@ -71,23 +71,63 @@ function to24(h: number, ap: string): number {
+ /**
+  * Parse the extracted site_visit_requested {date, slot} into a UTC Date,
+  * interpreting the wall-clock time as IST (+05:30). Returns null if unparseable.
+- *   date: "YYYY-MM-DD", slot: "11:00 AM - 12:00 PM" (start time is used)
++ *
++ * The classifier CONTRACT says date: "YYYY-MM-DD", slot: "HH:MM AM - HH:MM AM",
++ * but production shows other shapes too: DD-MM-YYYY, DD/MM/YYYY, ISO datetimes,
++ * 24-hour times, bare hours ("11", "1130") and part-of-day words ("morning").
++ * 89% of bookings got NO reminder because the strict parser returned null on
++ * anything off-contract — accept every shape observed. Part-of-day mapping
++ * follows the same convention the classifier prompt uses for callbacks:
++ * morning=10:00, afternoon=15:00, evening=18:00, night=20:00.
+  */
+ export function parseVisitDateTime(date?: string | null, slot?: string | null): Date | null {
+   if (!date) return null;
+-  const d = /^(\d{4})-(\d{2})-(\d{2})/.exec(date);
+-  if (!d) return null;
++  const ds = String(date).trim();
++  let yyyy = '', MM = '', DD = '';
++  let m = /^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/.exec(ds); // YYYY-MM-DD, YYYY/M/D
++  if (m) { yyyy = m[1]; MM = m[2]; DD = m[3]; }
++  if (!yyyy) {
++    m = /^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/.exec(ds);   // DD-MM-YYYY, DD/MM/YYYY
++    if (m) { yyyy = m[3]; MM = m[2]; DD = m[1]; }
++  }
++  if (!yyyy) return null;
++  // day/month swap guard: "2026-25-12" style month>12 with a plausible day
++  if (Number(MM) > 12 && Number(DD) <= 12) { const t = MM; MM = DD; DD = t; }
++  if (Number(MM) < 1 || Number(MM) > 12 || Number(DD) < 1 || Number(DD) > 31) return null;
+   let hh = 10; // sensible default if slot missing/garbled
+   let mm = 0;
++  // An ISO datetime in `date` carries its own time ("2026-08-09T11:30:00+05:30").
++  const isoT = /[T ](\d{2}):(\d{2})/.exec(ds);
++  if (isoT) { hh = Number(isoT[1]); mm = Number(isoT[2]); }
+   if (slot) {
+-    // Accept "11:30 AM", "11 AM", or the start of a range like "11 AM to 12 PM".
+-    const m = /(\d{1,2})(?::(\d{2}))?\s*(AM|PM)/i.exec(slot);
+-    if (m) {
+-      hh = to24(Number(m[1]), m[3] as string);
+-      mm = m[2] ? Number(m[2]) : 0;
++    const s = String(slot).trim();
++    // 1) "11:30 AM", "11 AM", or the start of a range like "11 AM to 12 PM".
++    let sm = /(\d{1,2})(?::(\d{2}))?\s*(AM|PM)/i.exec(s);
++    if (sm) {
++      hh = to24(Number(sm[1]), sm[3] as string);
++      mm = sm[2] ? Number(sm[2]) : 0;
++    } else if ((sm = /^(\d{1,2}):(\d{2})/.exec(s))) {
++      // 2) 24-hour "14:00"; bare "1:30".."7:30" are afternoon visits → PM
++      hh = Number(sm[1]); mm = Number(sm[2]);
++      if (hh >= 1 && hh <= 7) hh += 12;
++    } else if ((sm = /^(\d{3,4})$/.exec(s))) {
++      // 3) bare "1130"
++      hh = Number(sm[1].slice(0, -2)); mm = Number(sm[1].slice(-2));
++      if (hh >= 1 && hh <= 7) hh += 12;
++    } else if ((sm = /^(\d{1,2})$/.exec(s))) {
++      // 4) bare "11"
++      hh = Number(sm[1]); mm = 0;
++      if (hh >= 1 && hh <= 7) hh += 12;
++    } else if (/morning|subah|forenoon/i.test(s)) { hh = 10; mm = 0;
++    } else if (/noon|lunch/i.test(s)) { hh = 12; mm = 0;
++    } else if (/afternoon|dopahar/i.test(s)) { hh = 15; mm = 0;
++    } else if (/evening|shaam|sham/i.test(s)) { hh = 18; mm = 0;
++    } else if (/night|raat/i.test(s)) { hh = 20; mm = 0;
+     }
+   }
+-  const iso = `${d[1]}-${d[2]}-${d[3]}T${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:00+05:30`;
++  if (hh > 23 || mm > 59) return null;
++  const iso = `${yyyy}-${String(Number(MM)).padStart(2, '0')}-${String(Number(DD)).padStart(2, '0')}` +
++    `T${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:00+05:30`;
+   const dt = new Date(iso);
+   return Number.isNaN(dt.getTime()) ? null : dt;
+ }

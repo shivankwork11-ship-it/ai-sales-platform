@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Design A — Bloomberg Terminal</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #080808;
+    --bg-2: #0f0f0f;
+    --bg-3: #151515;
+    --border: #222;
+    --border-bright: #333;
+    --accent: #FF6200;
+    --accent-dim: rgba(255,98,0,0.12);
+    --text: #E8E8E8;
+    --text-dim: #777;
+    --text-muted: #444;
+    --green: #00C87A;
+    --red: #FF3B3B;
+    --amber: #FFA800;
+    --cyan: #00BFFF;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 14px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Scanline overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.03) 2px,
+      rgba(0,0,0,0.03) 4px
+    );
+    pointer-events: none;
+    z-index: 1000;
+  }
+
+  /* ── TOPBAR ── */
+  .topbar {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    height: 44px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .topbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    padding: 0 20px;
+    height: 100%;
+    border-right: 1px solid var(--border);
+    background: var(--accent);
+  }
+
+  .brand-mark {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 18px;
+    font-weight: 800;
+    color: #000;
+    letter-spacing: 0.02em;
+  }
+
+  .topbar-title {
+    padding: 0 20px;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.15em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    border-right: 1px solid var(--border);
+    height: 100%;
+    display: flex;
+    align-items: center;
+  }
+
+  .topbar-time {
+    margin-left: auto;
+    padding: 0 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 0.05em;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    border-left: 1px solid var(--border);
+  }
+
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+    animation: blink 2s ease-in-out infinite;
+  }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  .topbar-actions {
+    display: flex;
+    align-items: center;
+    height: 100%;
+    border-left: 1px solid var(--border);
+  }
+
+  .btn-terminal {
+    height: 100%;
+    padding: 0 20px;
+    background: none;
+    border: none;
+    border-right: 1px solid var(--border);
+    color: var(--text-dim);
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .btn-terminal:hover { background: var(--bg-3); color: var(--text); }
+
+  .btn-terminal.primary {
+    background: var(--accent);
+    color: #000;
+    font-weight: 700;
+  }
+  .btn-terminal.primary:hover { background: #ff7a2a; }
+
+  /* ── TICKER ── */
+  .ticker {
+    height: 30px;
+    background: var(--bg-2);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+    gap: 0;
+  }
+
+  .ticker-label {
+    padding: 0 14px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    color: #000;
+    background: var(--accent);
+    height: 100%;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    text-transform: uppercase;
+  }
+
+  .ticker-items {
+    display: flex;
+    gap: 0;
+    animation: scroll 30s linear infinite;
+    flex-shrink: 0;
+  }
+
+  .ticker-item {
+    padding: 0 24px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-right: 1px solid var(--border);
+    white-space: nowrap;
+  }
+
+  .ticker-item span { color: var(--text); font-weight: 500; }
+  .ticker-item .up { color: var(--green); }
+  .ticker-item .dn { color: var(--red); }
+
+  @keyframes scroll {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+
+  /* ── STAT ROW ── */
+  .stat-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .stat-block {
+    padding: 16px 20px;
+    border-right: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+    animation: fadeIn 0.4s ease both;
+  }
+
+  .stat-block::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 0;
+    height: 2px;
+    background: var(--accent);
+    transition: width 1s ease;
+  }
+
+  .stat-block:hover::after { width: 100%; }
+
+  .stat-label {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .stat-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 36px;
+    font-weight: 600;
+    color: var(--accent);
+    line-height: 1;
+    letter-spacing: -0.02em;
+  }
+
+  .stat-sub {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 4px;
+    letter-spacing: 0.05em;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* ── MAIN GRID ── */
+  .main {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    height: calc(100vh - 104px);
+  }
+
+  /* ── TABLE PANEL ── */
+  .table-panel {
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .panel-header {
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    height: 38px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-2);
+    gap: 12px;
+    flex-shrink: 0;
+  }
+
+  .panel-title {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  .panel-count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-left: auto;
+  }
+
+  .search-bar {
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    height: 36px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+    gap: 10px;
+    flex-shrink: 0;
+  }
+
+  .search-bar input {
+    flex: 1;
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+  }
+
+  .search-bar input::placeholder { color: var(--text-muted); }
+
+  .search-icon { color: var(--text-muted); font-size: 11px; }
+
+  .table-scroll { overflow-y: auto; flex: 1; }
+
+  .table-scroll::-webkit-scrollbar { width: 3px; }
+  .table-scroll::-webkit-scrollbar-track { background: var(--bg); }
+  .table-scroll::-webkit-scrollbar-thumb { background: var(--border-bright); }
+
+  table { width: 100%; border-collapse: collapse; }
+
+  thead th {
+    padding: 8px 12px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    text-align: left;
+    background: var(--bg-2);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    white-space: nowrap;
+  }
+
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.1s;
+    animation: slideIn 0.3s ease both;
+  }
+
+  tbody tr:hover { background: var(--bg-2); }
+  tbody tr.active { background: var(--accent-dim); border-left: 2px solid var(--accent); }
+
+  td {
+    padding: 8px 12px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .td-name { font-weight: 600; color: var(--text); font-size: 12px; }
+  .td-phone { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-dim); }
+  .td-mono { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text); }
+  .td-dim { color: var(--text-muted); }
+
+  .badge {
+    display: inline-block;
+    padding: 1px 7px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    border: 1px solid;
+  }
+
+  .badge-src { border-color: var(--cyan); color: var(--cyan); }
+  .badge-green { border-color: var(--green); color: var(--green); }
+  .badge-red { border-color: var(--red); color: var(--red); }
+  .badge-amber { border-color: var(--amber); color: var(--amber); }
+  .badge-gray { border-color: var(--border-bright); color: var(--text-muted); }
+
+  /* ── SIDE PANEL ── */
+  .side-panel {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--bg);
+  }
+
+  .side-section {
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .side-section-head {
+    padding: 8px 16px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    background: var(--bg-2);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .side-section-head span { color: var(--accent); }
+
+  .metric-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+  }
+
+  .metric-cell {
+    padding: 12px 16px;
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .metric-cell:nth-child(even) { border-right: none; }
+
+  .metric-cell-label {
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    margin-bottom: 5px;
+  }
+
+  .metric-cell-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 20px;
+    font-weight: 500;
+    color: var(--accent);
+  }
+
+  .mini-bar-wrap {
+    padding: 12px 16px;
+  }
+
+  .mini-bar-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .mini-bar {
+    height: 3px;
+    background: var(--border-bright);
+    overflow: hidden;
+  }
+
+  .mini-bar-fill {
+    height: 100%;
+    background: var(--accent);
+    transition: width 1.2s ease;
+  }
+
+  .mini-bar-fill.green { background: var(--green); }
+  .mini-bar-fill.cyan { background: var(--cyan); }
+
+  .recent-list { overflow-y: auto; flex: 1; }
+
+  .recent-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+
+  .recent-item:hover { background: var(--bg-2); }
+
+  .recent-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .dot-green { background: var(--green); }
+  .dot-amber { background: var(--amber); }
+  .dot-red { background: var(--red); }
+
+  .recent-name { font-size: 11px; font-weight: 600; flex: 1; }
+  .recent-meta { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--text-muted); }
+
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes slideIn { from { opacity: 0; transform: translateX(-4px); } to { opacity: 1; transform: none; } }
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<header class="topbar">
+  <div class="topbar-brand"><span class="brand-mark">ASBL</span></div>
+  <div class="topbar-title">Lead Intelligence Terminal</div>
+  <div class="topbar-time">
+    <div class="status-dot"></div>
+    <span id="clock">LIVE · 11:42 AM</span>
+    <span style="color:var(--text-muted)">Updated 11:41</span>
+  </div>
+  <div class="topbar-actions">
+    <button class="btn-terminal">↺ Refresh</button>
+    <button class="btn-terminal primary">↓ Export XLS</button>
+  </div>
+</header>
+
+<!-- TICKER -->
+<div class="ticker">
+  <div class="ticker-label">Live</div>
+  <div class="ticker-items">
+    <div class="ticker-item">TOTAL LEADS <span>446</span></div>
+    <div class="ticker-item">WEB ACTIVE <span>446</span></div>
+    <div class="ticker-item">WHATSAPP <span class="up">112</span></div>
+    <div class="ticker-item">CALLS ANSWERED <span class="up">93</span></div>
+    <div class="ticker-item">PICKUP RATIO <span class="up">21.1%</span></div>
+    <div class="ticker-item">AVG DURATION <span>2m 14s</span></div>
+    <div class="ticker-item">OUTBOUND TRIGGERED <span>428</span></div>
+    <div class="ticker-item">INBOUND <span class="up">84</span></div>
+    <div class="ticker-item">TOTAL LEADS <span>446</span></div>
+    <div class="ticker-item">WEB ACTIVE <span>446</span></div>
+    <div class="ticker-item">WHATSAPP <span class="up">112</span></div>
+    <div class="ticker-item">CALLS ANSWERED <span class="up">93</span></div>
+    <div class="ticker-item">PICKUP RATIO <span class="up">21.1%</span></div>
+    <div class="ticker-item">AVG DURATION <span>2m 14s</span></div>
+    <div class="ticker-item">OUTBOUND TRIGGERED <span>428</span></div>
+    <div class="ticker-item">INBOUND <span class="up">84</span></div>
+  </div>
+</div>
+
+<!-- STAT ROW -->
+<div class="stat-row">
+  <div class="stat-block">
+    <div class="stat-label">Total Leads</div>
+    <div class="stat-value">446</div>
+    <div class="stat-sub">+12 this week</div>
+  </div>
+  <div class="stat-block">
+    <div class="stat-label">Website Active</div>
+    <div class="stat-value">446</div>
+    <div class="stat-sub">100% coverage</div>
+  </div>
+  <div class="stat-block">
+    <div class="stat-label">WhatsApp</div>
+    <div class="stat-value" style="color:var(--green)">112</div>
+    <div class="stat-sub">25.1% of base</div>
+  </div>
+  <div class="stat-block">
+    <div class="stat-label">Calls Answered</div>
+    <div class="stat-value" style="color:var(--amber)">93</div>
+    <div class="stat-sub">21.1% pickup rate</div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- TABLE PANEL -->
+  <div class="table-panel">
+    <div class="panel-header">
+      <div class="panel-title">Lead Registry</div>
+      <div class="panel-count">446 records · sorted by computed_at DESC</div>
+    </div>
+    <div class="search-bar">
+      <span class="search-icon">⌕</span>
+      <input type="text" placeholder="FILTER BY NAME · PHONE · SOURCE · CAMPAIGN…">
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Phone</th>
+            <th>Source</th>
+            <th>Campaign</th>
+            <th>Lead Since</th>
+            <th>Web</th>
+            <th>CTA</th>
+            <th>WA</th>
+            <th>Calls</th>
+            <th>Pickup</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="active">
+            <td class="td-name">Rajesh Kumar</td>
+            <td class="td-phone">+91 98765 43210</td>
+            <td><span class="badge badge-src">FIM</span></td>
+            <td><span style="font-size:10px;color:var(--text-dim)">loft-c2_lead</span></td>
+            <td class="td-mono" style="font-size:10px;">24 May 2026</td>
+            <td class="td-mono">8</td>
+            <td class="td-mono">3</td>
+            <td class="td-mono">5</td>
+            <td class="td-mono">2<span style="color:var(--text-muted)">/3</span></td>
+            <td><span class="badge badge-green">67%</span></td>
+          </tr>
+          <tr>
+            <td class="td-name">Priya Sharma</td>
+            <td class="td-phone">+91 87654 32109</td>
+            <td><span class="badge badge-src">Google</span></td>
+            <td><span style="font-size:10px;color:var(--text-dim)">loft-awareness</span></td>
+            <td class="td-mono" style="font-size:10px;">23 May 2026</td>
+            <td class="td-mono">12</td>
+            <td class="td-mono">5</td>
+            <td class="td-mono">0</td>
+            <td class="td-mono">1<span style="color:var(--text-muted)">/2</span></td>
+            <td><span class="badge badge-amber">50%</span></td>
+          </tr>
+          <tr>
+            <td class="td-name">Swathi</td>
+            <td class="td-phone">+91 93903 29071</td>
+            <td><span class="badge badge-src">FIM</span></td>
+            <td><span style="font-size:10px;color:var(--text-dim)">loft-c2_lead</span></td>
+            <td class="td-mono" style="font-size:10px;">24 May 2026</td>
+            <td class="td-mono">2</td>
+            <td class="td-mono">0</td>
+            <td class="td-mono">0</td>
+            <td class="td-mono">0<span style="color:var(--text-muted)">/1</span></td>
+            <td><span class="badge badge-red">0%</span></td>
+          </tr>
+          <tr>
+            <td class="td-name">Banoth Tharun</td>
+            <td class="td-phone">+91 90322 56946</td>
+            <td><span class="badge badge-src">FIM</span></td>
+            <td><span style="font-size:10px;color:var(--text-dim)">loft-c2_lead</span></td>
+            <td class="td-mono" style="font-size:10px;">24 May 2026</td>
+            <td class="td-mono">4</td>
+            <td class="td-mono">3</td>
+            <td class="td-mono">2</td>
+            <td class="td-mono">2<span style="color:var(--text-muted)">/2</span></td>
+            <td><span class="badge badge-green">100%</span></td>
+          </tr>
+          <tr>
+            <td class="td-name">Arjun Mehta</td>
+            <td class="td-phone">+91 94567 12345</td>
+            <td><span class="badge badge-src">Meta</span></td>
+            <td><span style="font-size:10px;color:var(--text-dim)">broadway-q2</span></td>
+            <td class="td-mono" style="font-size:10px;">22 May 2026</td>
+            <td class="td-mono">6</td>
+            <td class="td-mono">2</td>
+            <td class="td-mono">8</td>
+            <td class="td-mono td-dim">—</td>
+            <td><span style="color:var(--text-muted);font-size:10px;font-family:'JetBrains Mono',monospace;">N/A</span></td>
+          </tr>
+          <tr>
+            <td class="td-name">Sunita Reddy</td>
+            <td class="td-phone">+91 77654 99123</td>
+            <td><span class="badge badge-src">FIM</span></td>
+            <td><span style="font-size:10px;color:var(--text-dim)">loft-retarget</span></td>
+            <td class="td-mono" style="font-size:10px;">21 May 2026</td>
+            <td class="td-mono">18</td>
+            <td class="td-mono">7</td>
+            <td class="td-mono">3</td>
+            <td class="td-mono">3<span style="color:var(--text-muted)">/4</span></td>
+            <td><span class="badge badge-amber">75%</span></td>
+          </tr>
+          <tr>
+            <td class="td-name">Kiran Patel</td>
+            <td class="td-phone">+91 97053 66561</td>
+            <td><span class="badge badge-src">Organic</span></td>
+            <td><span style="font-size:10px;color:var(--text-dim)">direct</span></td>
+            <td class="td-mono" style="font-size:10px;">20 May 2026</td>
+            <td class="td-mono">3</td>
+            <td class="td-mono">1</td>
+            <td class="td-mono">0</td>
+            <td class="td-mono">0<span style="color:var(--text-muted)">/2</span></td>
+            <td><span class="badge badge-red">0%</span></td>
+          </tr>
+          <tr>
+            <td class="td-name">Nikhil Verma</td>
+            <td class="td-phone">+91 86030 07289</td>
+            <td><span class="badge badge-src">Google</span></td>
+            <td><span style="font-size:10px;color:var(--text-dim)">loft-search</span></td>
+            <td class="td-mono" style="font-size:10px;">19 May 2026</td>
+            <td class="td-mono">24</td>
+            <td class="td-mono">9</td>
+            <td class="td-mono">12</td>
+            <td class="td-mono">4<span style="color:var(--text-muted)">/5</span></td>
+            <td><span class="badge badge-green">80%</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- SIDE PANEL -->
+  <div class="side-panel">
+    <div class="side-section">
+      <div class="side-section-head">Channel Breakdown <span>Live</span></div>
+      <div class="metric-grid">
+        <div class="metric-cell">
+          <div class="metric-cell-label">Web Msgs</div>
+          <div class="metric-cell-val">3,842</div>
+        </div>
+        <div class="metric-cell">
+          <div class="metric-cell-label">CTA Hits</div>
+          <div class="metric-cell-val">1,204</div>
+        </div>
+        <div class="metric-cell">
+          <div class="metric-cell-label">WA Msgs</div>
+          <div class="metric-cell-val" style="color:var(--green)">891</div>
+        </div>
+        <div class="metric-cell">
+          <div class="metric-cell-label">Call Mins</div>
+          <div class="metric-cell-val" style="color:var(--amber)">342</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="side-section">
+      <div class="side-section-head">Engagement Rates</div>
+      <div class="mini-bar-wrap">
+        <div class="mini-bar-label"><span>Website Active</span><span>100%</span></div>
+        <div class="mini-bar"><div class="mini-bar-fill" style="width:100%"></div></div>
+      </div>
+      <div class="mini-bar-wrap">
+        <div class="mini-bar-label"><span>WhatsApp Depth</span><span>25.1%</span></div>
+        <div class="mini-bar"><div class="mini-bar-fill green" style="width:25.1%"></div></div>
+      </div>
+      <div class="mini-bar-wrap">
+        <div class="mini-bar-label"><span>Call Pickup</span><span>21.1%</span></div>
+        <div class="mini-bar"><div class="mini-bar-fill cyan" style="width:21.1%"></div></div>
+      </div>
+    </div>
+
+    <div class="side-section-head" style="border-bottom:1px solid var(--border)">Recent Activity <span style="color:var(--green)">● Live</span></div>
+    <div class="recent-list">
+      <div class="recent-item"><div class="recent-dot dot-green"></div><div><div class="recent-name">Rajesh Kumar</div><div class="recent-meta">Call answered · 3m 12s</div></div><div class="recent-meta">11:38</div></div>
+      <div class="recent-item"><div class="recent-dot dot-amber"></div><div><div class="recent-name">Priya Sharma</div><div class="recent-meta">WA message · depth 5</div></div><div class="recent-meta">11:35</div></div>
+      <div class="recent-item"><div class="recent-dot dot-red"></div><div><div class="recent-name">Swathi</div><div class="recent-meta">Call not answered</div></div><div class="recent-meta">11:32</div></div>
+      <div class="recent-item"><div class="recent-dot dot-green"></div><div><div class="recent-name">Banoth Tharun</div><div class="recent-meta">CTA triggered · 3 times</div></div><div class="recent-meta">11:28</div></div>
+      <div class="recent-item"><div class="recent-dot dot-green"></div><div><div class="recent-name">Sunita Reddy</div><div class="recent-meta">Call answered · 5m 41s</div></div><div class="recent-meta">11:21</div></div>
+      <div class="recent-item"><div class="recent-dot dot-amber"></div><div><div class="recent-name">Nikhil Verma</div><div class="recent-meta">Web chat · 24 messages</div></div><div class="recent-meta">11:18</div></div>
+      <div class="recent-item"><div class="recent-dot dot-red"></div><div><div class="recent-name">Kiran Patel</div><div class="recent-meta">Call not answered</div></div><div class="recent-meta">11:14</div></div>
+      <div class="recent-item"><div class="recent-dot dot-green"></div><div><div class="recent-name">Arjun Mehta</div><div class="recent-meta">WA depth · 8 msgs</div></div><div class="recent-meta">11:09</div></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  function updateClock() {
+    const now = new Date();
+    document.getElementById('clock').textContent =
+      'LIVE · ' + now.toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit'});
+  }
+  setInterval(updateClock, 1000);
+</script>
+</body>
+</html>

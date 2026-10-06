@@ -1,0 +1,83 @@
+diff --git a/agent/src/sitevisit/planner.ts b/agent/src/sitevisit/planner.ts
+index 460a207..2fabae9 100644
+--- a/agent/src/sitevisit/planner.ts
++++ b/agent/src/sitevisit/planner.ts
+@@ -14,7 +14,11 @@
+  * Any scheduled time that's already in the past is dropped.
+  */
+ 
+-export type SiteVisitSlug = 'site_visit_confirmation' | 'site_visit_reminder';
++export type SiteVisitSlug =
++  | 'site_visit_confirmation'
++  | 'site_visit_reminder'
++  | 'promised_callback'      // customer named a time; we said we'd call — keep it
++  | 'no_show_recovery';      // visit day passed, no completed visit — rebook
+ 
+ export interface ScheduledCall {
+   slug: SiteVisitSlug;
+@@ -55,6 +59,20 @@ export function planSiteVisitCalls(opts: {
+     if (r1.getTime() > now.getTime()) {
+       out.push({ slug: 'site_visit_reminder', dueAt: r1, label: 'reminder 1h before' });
+     }
++    // Human-corpus finding (day-anchored callback promise, n=1,013): winning
++    // human agents place a confirmation call the DAY BEFORE the visit on top
++    // of same-day reminders. When the visit is more than 24h out, add it at
++    // 18:00 IST the previous day (12:30 UTC).
++    if (visitAt.getTime() - now.getTime() > 24 * HOUR) {
++      const dayBefore = new Date(visitAt.getTime());
++      dayBefore.setUTCDate(dayBefore.getUTCDate() - 1);
++      dayBefore.setUTCHours(12, 30, 0, 0);
++      if (dayBefore.getTime() > now.getTime() &&
++          visitAt.getTime() - dayBefore.getTime() > 2 * HOUR) {
++        out.push({ slug: 'site_visit_reminder', dueAt: dayBefore,
++                   label: 'day-before confirmation (human-corpus pattern)' });
++      }
++    }
+   }
+ 
+   return out.sort((a, b) => a.dueAt.getTime() - b.dueAt.getTime());
+@@ -131,3 +149,44 @@ export function parseVisitDateTime(date?: string | null, slot?: string | null):
+   const dt = new Date(iso);
+   return Number.isNaN(dt.getTime()) ? null : dt;
+ }
++
++/**
++ * AUTO_CALLBACK promise-keeping. The classifier already extracts
++ * preferred_callback_time as ISO+05:30 and ships it on the webhook, but
++ * NOTHING in the agent schedules from it — the promise currently evaporates
++ * unless the upstream CRM acts. Funnel evidence: ≤24h-old leads connect at
++ * 53% vs 31% at 3+ days. Honour the customer-named slot verbatim
++ * (human-corpus pattern: permission-based follow-up scheduling, n=1,095).
++ */
++export function planPromisedCallback(opts: {
++  callEndedAt: Date;
++  preferredCallbackTime: string | null | undefined;
++  now?: Date;
++}): ScheduledCall | null {
++  const now = opts.now ?? opts.callEndedAt;
++  if (!opts.preferredCallbackTime) return null;
++  const at = new Date(opts.preferredCallbackTime);
++  if (Number.isNaN(at.getTime())) return null;
++  // clamp: never earlier than 30m from now, never further than 14 days out
++  const min = new Date(now.getTime() + 30 * MIN);
++  const max = new Date(now.getTime() + 14 * 24 * HOUR);
++  const due = at.getTime() < min.getTime() ? min : at;
++  if (due.getTime() > max.getTime()) return null;
++  return { slug: 'promised_callback', dueAt: due,
++           label: 'customer-named callback slot (kept verbatim)' };
++}
++
++/**
++ * No-show recovery. Call the morning after a missed visit (11:00 IST) to
++ * refix — the human-corpus 'reschedule-not-drop' pattern (n=800): a visit is
++ * postponed, never abandoned. The caller decides whether the visit actually
++ * completed (Zoho/ops truth) before dialling.
++ */
++export function planNoShowRecovery(opts: { visitAt: Date; now: Date }): ScheduledCall | null {
++  const nextMorning = new Date(opts.visitAt.getTime());
++  nextMorning.setUTCDate(nextMorning.getUTCDate() + 1);
++  nextMorning.setUTCHours(5, 30, 0, 0); // 11:00 IST
++  if (nextMorning.getTime() <= opts.now.getTime()) return null;
++  return { slug: 'no_show_recovery', dueAt: nextMorning,
++           label: 'no-show recovery — refix the visit (reschedule-not-drop)' };
++}

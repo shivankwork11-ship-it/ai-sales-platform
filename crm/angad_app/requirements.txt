@@ -1,0 +1,8 @@
+# ANGAD "Main Dashboard" backend dependencies.
+# Installed in the ECS image ON TOP OF the root requirements.txt. Kept SEPARATE so
+# the root requirements.txt stays lean and the existing (Vercel) build is NOT
+# bloated by pandas/pyarrow. pymongo + certifi come from the root requirements.
+pandas==3.0.5
+numpy==2.5.2
+pyarrow==25.0.0
+python-dotenv==1.2.2

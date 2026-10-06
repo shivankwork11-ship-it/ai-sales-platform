@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Design C — Deep Navy Glass</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Outfit:wght@300;400;500;600&family=Fira+Code:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #060C14;
+    --bg-2: #0B1420;
+    --glass: rgba(255,255,255,0.04);
+    --glass-border: rgba(255,255,255,0.08);
+    --glass-hover: rgba(255,255,255,0.07);
+    --accent: #00E5C8;
+    --accent-2: #0085FF;
+    --accent-dim: rgba(0,229,200,0.1);
+    --accent-2-dim: rgba(0,133,255,0.1);
+    --text: #EDF2F7;
+    --text-dim: #7A8FA6;
+    --text-muted: #3D4F63;
+    --green: #10D9A0;
+    --red: #FF4D6A;
+    --amber: #FFB800;
+    --purple: #9D7AF8;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Outfit', sans-serif;
+    font-size: 13px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Gradient mesh background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 80% 60% at 10% 0%, rgba(0,133,255,0.08) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 40% at 90% 100%, rgba(0,229,200,0.06) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Grid pattern overlay */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── TOPBAR ── */
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    padding: 0 32px;
+    background: rgba(6,12,20,0.85);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--glass-border);
+    gap: 32px;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .logo-hex {
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Syne', sans-serif;
+    font-size: 12px;
+    font-weight: 800;
+    color: #000;
+    letter-spacing: -0.02em;
+  }
+
+  .logo-text {
+    font-family: 'Syne', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: 0.02em;
+  }
+
+  .logo-sub {
+    font-size: 10px;
+    font-weight: 400;
+    color: var(--text-dim);
+    letter-spacing: 0.04em;
+    display: block;
+    margin-top: -2px;
+  }
+
+  .nav-pill {
+    padding: 5px 14px;
+    border-radius: 100px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-dim);
+    background: none;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.02em;
+  }
+
+  .nav-pill:hover, .nav-pill.active {
+    background: var(--glass);
+    color: var(--text);
+  }
+
+  .topbar-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .live-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    border: 1px solid rgba(16,217,160,0.3);
+    border-radius: 100px;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--green);
+    letter-spacing: 0.08em;
+    background: rgba(16,217,160,0.06);
+  }
+
+  .live-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--green);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(16,217,160,0.4); }
+    50% { opacity: 0.7; box-shadow: 0 0 0 4px rgba(16,217,160,0); }
+  }
+
+  .btn-glass {
+    padding: 7px 18px;
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    color: var(--text-dim);
+    font-family: 'Outfit', sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.02em;
+  }
+
+  .btn-glass:hover { background: var(--glass-hover); color: var(--text); }
+
+  .btn-accent {
+    padding: 7px 20px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    border: none;
+    border-radius: 8px;
+    color: #000;
+    font-family: 'Outfit', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s;
+    letter-spacing: 0.02em;
+  }
+
+  .btn-accent:hover { opacity: 0.9; }
+
+  /* ── STAT CARDS ── */
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    padding: 24px 32px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .stat-card {
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    padding: 20px 24px;
+    position: relative;
+    overflow: hidden;
+    backdrop-filter: blur(10px);
+    transition: transform 0.2s, border-color 0.2s;
+    animation: cardIn 0.4s ease both;
+  }
+
+  .stat-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(255,255,255,0.14);
+  }
+
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+  }
+
+  .stat-card-glow {
+    position: absolute;
+    top: -30px;
+    right: -30px;
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    opacity: 0.15;
+    filter: blur(20px);
+  }
+
+  .stat-icon {
+    font-size: 16px;
+    margin-bottom: 12px;
+    opacity: 0.7;
+  }
+
+  .stat-val {
+    font-family: 'Syne', sans-serif;
+    font-size: 40px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    margin-bottom: 4px;
+  }
+
+  .stat-lbl {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-dim);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  /* ── MAIN ── */
+  .main {
+    display: grid;
+    grid-template-columns: 1fr 300px;
+    gap: 16px;
+    padding: 0 32px 32px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ── TABLE CARD ── */
+  .table-card {
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    overflow: hidden;
+    backdrop-filter: blur(10px);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--glass-border);
+    gap: 12px;
+  }
+
+  .card-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+
+  .card-count {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-family: 'Fira Code', monospace;
+    margin-left: auto;
+  }
+
+  .search-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 20px;
+    border-bottom: 1px solid var(--glass-border);
+    background: rgba(0,0,0,0.2);
+  }
+
+  .search-wrap input {
+    flex: 1;
+    background: none;
+    border: none;
+    outline: none;
+    font-family: 'Outfit', sans-serif;
+    font-size: 12px;
+    color: var(--text);
+  }
+
+  .search-wrap input::placeholder { color: var(--text-muted); }
+
+  .tbl-scroll {
+    overflow-y: auto;
+    max-height: calc(100vh - 320px);
+  }
+
+  .tbl-scroll::-webkit-scrollbar { width: 3px; }
+  .tbl-scroll::-webkit-scrollbar-thumb { background: var(--glass-border); border-radius: 2px; }
+
+  table { width: 100%; border-collapse: collapse; }
+
+  thead th {
+    padding: 10px 14px;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    text-align: left;
+    background: rgba(0,0,0,0.3);
+    border-bottom: 1px solid var(--glass-border);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    white-space: nowrap;
+  }
+
+  tbody tr {
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  tbody tr:hover { background: var(--glass-hover); }
+  tbody tr.hl { background: var(--accent-dim); }
+
+  td { padding: 10px 14px; font-size: 12px; }
+
+  .td-n { font-weight: 600; color: var(--text); }
+  .td-ph { font-family: 'Fira Code', monospace; font-size: 10px; color: var(--text-dim); }
+  .td-num { font-family: 'Fira Code', monospace; font-size: 11px; }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 9px;
+    border-radius: 100px;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .chip-cyan { background: rgba(0,229,200,0.12); color: var(--accent); border: 1px solid rgba(0,229,200,0.2); }
+  .chip-blue { background: rgba(0,133,255,0.12); color: #5B9FFF; border: 1px solid rgba(0,133,255,0.2); }
+  .chip-purple { background: rgba(157,122,248,0.12); color: var(--purple); border: 1px solid rgba(157,122,248,0.2); }
+
+  .pct-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 600;
+    font-family: 'Fira Code', monospace;
+  }
+
+  .pct-green { background: rgba(16,217,160,0.12); color: var(--green); }
+  .pct-amber { background: rgba(255,184,0,0.12); color: var(--amber); }
+  .pct-red { background: rgba(255,77,106,0.12); color: var(--red); }
+  .pct-na { color: var(--text-muted); font-size: 10px; font-style: italic; }
+
+  /* ── SIDE ── */
+  .side-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .glass-card {
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    overflow: hidden;
+    backdrop-filter: blur(10px);
+  }
+
+  .gc-head {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--glass-border);
+    font-family: 'Syne', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--text);
+  }
+
+  .channel-row {
+    display: flex;
+    align-items: center;
+    padding: 12px 18px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    gap: 12px;
+  }
+
+  .ch-icon {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+
+  .ch-icon-w { background: linear-gradient(135deg, #25D366, #128C7E); }
+  .ch-icon-c { background: linear-gradient(135deg, var(--accent), var(--accent-2)); }
+  .ch-icon-b { background: linear-gradient(135deg, #FF6B35, #FF3B3B); }
+
+  .ch-label { font-size: 11px; font-weight: 500; color: var(--text-dim); }
+  .ch-val { font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 700; color: var(--text); }
+
+  .bar-block { padding: 14px 18px; }
+  .bar-row-label { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-muted); margin-bottom: 5px; letter-spacing: 0.04em; }
+  .bar-track { height: 4px; background: rgba(255,255,255,0.06); border-radius: 100px; margin-bottom: 12px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 100px; }
+  .bf-1 { background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
+  .bf-2 { background: var(--green); }
+  .bf-3 { background: var(--amber); }
+
+  .activity-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 18px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .activity-item:hover { background: var(--glass-hover); }
+
+  .av {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-dim);
+    flex-shrink: 0;
+  }
+
+  .av-name { font-size: 11px; font-weight: 600; color: var(--text); }
+  .av-meta { font-size: 9px; color: var(--text-muted); margin-top: 1px; }
+  .av-time { font-family: 'Fira Code', monospace; font-size: 9px; color: var(--text-muted); margin-left: auto; }
+
+  @keyframes cardIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: none; }
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="logo">
+    <div class="logo-hex">AS</div>
+    <div>
+      <span class="logo-text">ASBL</span>
+      <span class="logo-sub">Lead Intelligence Platform</span>
+    </div>
+  </div>
+  <button class="nav-pill active">Leads</button>
+  <button class="nav-pill">Analytics</button>
+  <button class="nav-pill">Campaigns</button>
+  <div class="topbar-right">
+    <div class="live-badge"><div class="live-dot"></div>Live · 11:41</div>
+    <button class="btn-glass">↺ Refresh</button>
+    <button class="btn-accent">↓ Download Excel</button>
+  </div>
+</header>
+
+<div class="stat-grid">
+  <div class="stat-card" style="animation-delay:0s">
+    <div class="stat-card-glow" style="background:var(--accent-2)"></div>
+    <div class="stat-icon">◈</div>
+    <div class="stat-val" style="color:var(--text)">446</div>
+    <div class="stat-lbl">Total Leads</div>
+  </div>
+  <div class="stat-card" style="animation-delay:0.07s">
+    <div class="stat-card-glow" style="background:var(--accent)"></div>
+    <div class="stat-icon">⬡</div>
+    <div class="stat-val" style="color:var(--accent)">446</div>
+    <div class="stat-lbl">Website Active</div>
+  </div>
+  <div class="stat-card" style="animation-delay:0.14s">
+    <div class="stat-card-glow" style="background:var(--green)"></div>
+    <div class="stat-icon">✉</div>
+    <div class="stat-val" style="color:var(--green)">112</div>
+    <div class="stat-lbl">WhatsApp</div>
+  </div>
+  <div class="stat-card" style="animation-delay:0.21s">
+    <div class="stat-card-glow" style="background:var(--amber)"></div>
+    <div class="stat-icon">◎</div>
+    <div class="stat-val" style="color:var(--amber)">93</div>
+    <div class="stat-lbl">Calls Answered</div>
+  </div>
+</div>
+
+<div class="main">
+  <div class="table-card">
+    <div class="card-header">
+      <span class="card-title">Lead Registry</span>
+      <span class="card-count">446 records</span>
+    </div>
+    <div class="search-wrap">
+      <span style="color:var(--text-muted)">⌕</span>
+      <input type="text" placeholder="Search by name, phone, source, campaign…">
+    </div>
+    <div class="tbl-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th><th>Phone</th><th>Source</th><th>Campaign</th>
+            <th>Lead Since</th><th>Web</th><th>CTA</th><th>WA</th><th>Calls</th><th>Pickup</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="hl">
+            <td class="td-n">Rajesh Kumar</td>
+            <td class="td-ph">+91 98765 43210</td>
+            <td><span class="chip chip-cyan">FIM</span></td>
+            <td style="font-size:10px;color:var(--text-dim)">loft-c2_lead</td>
+            <td style="font-family:'Fira Code',monospace;font-size:10px;color:var(--text-dim)">24 May 2026</td>
+            <td class="td-num">8</td><td class="td-num">3</td><td class="td-num">5</td>
+            <td class="td-num">2<span style="color:var(--text-muted)">/3</span></td>
+            <td><span class="pct-badge pct-green">67%</span></td>
+          </tr>
+          <tr>
+            <td class="td-n">Priya Sharma</td>
+            <td class="td-ph">+91 87654 32109</td>
+            <td><span class="chip chip-blue">Google</span></td>
+            <td style="font-size:10px;color:var(--text-dim)">loft-awareness</td>
+            <td style="font-family:'Fira Code',monospace;font-size:10px;color:var(--text-dim)">23 May 2026</td>
+            <td class="td-num">12</td><td class="td-num">5</td><td class="td-num">0</td>
+            <td class="td-num">1<span style="color:var(--text-muted)">/2</span></td>
+            <td><span class="pct-badge pct-amber">50%</span></td>
+          </tr>
+          <tr>
+            <td class="td-n">Swathi</td>
+            <td class="td-ph">+91 93903 29071</td>
+            <td><span class="chip chip-cyan">FIM</span></td>
+            <td style="font-size:10px;color:var(--text-dim)">loft-c2_lead</td>
+            <td style="font-family:'Fira Code',monospace;font-size:10px;color:var(--text-dim)">24 May 2026</td>
+            <td class="td-num">2</td><td class="td-num">0</td><td class="td-num">0</td>
+            <td class="td-num">0<span style="color:var(--text-muted)">/1</span></td>
+            <td><span class="pct-badge pct-red">0%</span></td>
+          </tr>
+          <tr>
+            <td class="td-n">Banoth Tharun</td>
+            <td class="td-ph">+91 90322 56946</td>
+            <td><span class="chip chip-cyan">FIM</span></td>
+            <td style="font-size:10px;color:var(--text-dim)">loft-c2_lead</td>
+            <td style="font-family:'Fira Code',monospace;font-size:10px;color:var(--text-dim)">24 May 2026</td>
+            <td class="td-num">4</td><td class="td-num">3</td><td class="td-num">2</td>
+            <td class="td-num">2<span style="color:var(--text-muted)">/2</span></td>
+            <td><span class="pct-badge pct-green">100%</span></td>
+          </tr>
+          <tr>
+            <td class="td-n">Arjun Mehta</td>
+            <td class="td-ph">+91 94567 12345</td>
+            <td><span class="chip chip-purple">Meta</span></td>
+            <td style="font-size:10px;color:var(--text-dim)">broadway-q2</td>
+            <td style="font-family:'Fira Code',monospace;font-size:10px;color:var(--text-dim)">22 May 2026</td>
+            <td class="td-num">6</td><td class="td-num">2</td><td class="td-num">8</td>
+            <td class="td-num" style="color:var(--text-muted)">—</td>
+            <td><span class="pct-na">N/A</span></td>
+          </tr>
+          <tr>
+            <td class="td-n">Sunita Reddy</td>
+            <td class="td-ph">+91 77654 99123</td>
+            <td><span class="chip chip-cyan">FIM</span></td>
+            <td style="font-size:10px;color:var(--text-dim)">loft-retarget</td>
+            <td style="font-family:'Fira Code',monospace;font-size:10px;color:var(--text-dim)">21 May 2026</td>
+            <td class="td-num">18</td><td class="td-num">7</td><td class="td-num">3</td>
+            <td class="td-num">3<span style="color:var(--text-muted)">/4</span></td>
+            <td><span class="pct-badge pct-green">75%</span></td>
+          </tr>
+          <tr>
+            <td class="td-n">Nikhil Verma</td>
+            <td class="td-ph">+91 86030 07289</td>
+            <td><span class="chip chip-blue">Google</span></td>
+            <td style="font-size:10px;color:var(--text-dim)">loft-search</td>
+            <td style="font-family:'Fira Code',monospace;font-size:10px;color:var(--text-dim)">19 May 2026</td>
+            <td class="td-num">24</td><td class="td-num">9</td><td class="td-num">12</td>
+            <td class="td-num">4<span style="color:var(--text-muted)">/5</span></td>
+            <td><span class="pct-badge pct-green">80%</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="side-stack">
+    <div class="glass-card">
+      <div class="gc-head">Channel Overview</div>
+      <div class="channel-row"><div class="ch-icon ch-icon-b">⬡</div><div><div class="ch-label">Web Messages</div><div class="ch-val">3,842</div></div></div>
+      <div class="channel-row"><div class="ch-icon ch-icon-w">✉</div><div><div class="ch-label">WhatsApp</div><div class="ch-val">891</div></div></div>
+      <div class="channel-row"><div class="ch-icon ch-icon-c">◎</div><div><div class="ch-label">Call Minutes</div><div class="ch-val">342</div></div></div>
+      <div class="bar-block">
+        <div class="bar-row-label"><span>Website Active</span><span style="color:var(--text)">100%</span></div>
+        <div class="bar-track"><div class="bar-fill bf-1" style="width:100%"></div></div>
+        <div class="bar-row-label"><span>WhatsApp</span><span style="color:var(--text)">25.1%</span></div>
+        <div class="bar-track"><div class="bar-fill bf-2" style="width:25.1%"></div></div>
+        <div class="bar-row-label"><span>Call Pickup</span><span style="color:var(--text)">21.1%</span></div>
+        <div class="bar-track"><div class="bar-fill bf-3" style="width:21.1%"></div></div>
+      </div>
+    </div>
+
+    <div class="glass-card">
+      <div class="gc-head">Recent Activity</div>
+      <div class="activity-item"><div class="av" style="color:var(--green);border-color:rgba(16,217,160,0.2);background:rgba(16,217,160,0.06)">RK</div><div><div class="av-name">Rajesh Kumar</div><div class="av-meta">Call answered · 3m 12s</div></div><div class="av-time">11:38</div></div>
+      <div class="activity-item"><div class="av" style="color:var(--amber);border-color:rgba(255,184,0,0.2);background:rgba(255,184,0,0.06)">PS</div><div><div class="av-name">Priya Sharma</div><div class="av-meta">WA message · depth 5</div></div><div class="av-time">11:35</div></div>
+      <div class="activity-item"><div class="av" style="color:var(--red);border-color:rgba(255,77,106,0.2);background:rgba(255,77,106,0.06)">SW</div><div><div class="av-name">Swathi</div><div class="av-meta">Call not answered</div></div><div class="av-time">11:32</div></div>
+      <div class="activity-item"><div class="av" style="color:var(--accent);border-color:rgba(0,229,200,0.2);background:rgba(0,229,200,0.06)">BT</div><div><div class="av-name">Banoth Tharun</div><div class="av-meta">CTA triggered · 3×</div></div><div class="av-time">11:28</div></div>
+      <div class="activity-item"><div class="av" style="color:var(--green);border-color:rgba(16,217,160,0.2);background:rgba(16,217,160,0.06)">SR</div><div><div class="av-name">Sunita Reddy</div><div class="av-meta">Call answered · 5m 41s</div></div><div class="av-time">11:21</div></div>
+      <div class="activity-item"><div class="av" style="color:var(--accent-2);border-color:rgba(0,133,255,0.2);background:rgba(0,133,255,0.06)">NV</div><div><div class="av-name">Nikhil Verma</div><div class="av-meta">Web chat · 24 messages</div></div><div class="av-time">11:18</div></div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
