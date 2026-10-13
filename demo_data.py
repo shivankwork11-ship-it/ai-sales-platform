@@ -12,6 +12,8 @@ connects to a real MongoDB, and nothing is saved: data resets on each start.
 
 Self-check:  python demo_data.py
 """
+import json
+import os
 import random
 from collections import Counter
 from datetime import datetime, timedelta, timezone
@@ -47,6 +49,43 @@ STAGES = {"New Lead": 25, "Lead Initiated": 38, "Pre Site Visit": 12,
 NI_REASONS = ["Not Responding", "Declined", "Budget", "Inventory", "Already Purchased",
               "Location", "Looking for Rent"]
 MISSED = ["NO_ANSWER", "NO_ANSWER", "BUSY", "NOT_CONNECTED", "SWITCHED_OFF"]
+
+# One script per answered call type. make_recordings.py turns each into a real audio
+# clip (agent + customer voices), so every call's transcript matches what you hear.
+_GREETING = ("agent", "Hello, this is Anandita calling about the homes you enquired about. "
+                      "Is this a good time to talk?")
+CALL_SCRIPTS = {
+    "CONNECTED": [_GREETING, ("customer", "Yes, tell me."),
+                  ("agent", "Are you looking for a 3 BHK or a 4 BHK?"),
+                  ("customer", "3 BHK. When is possession?"),
+                  ("agent", "Possession is planned for December 2027. I will send you the brochure "
+                            "and price sheet on WhatsApp."),
+                  ("customer", "Okay, thank you."), ("agent", "Thank you, have a great day.")],
+    "PRE_SITE": [_GREETING, ("customer", "Yes, go ahead."),
+                 ("agent", "Would you like to visit the site and see the show flat this weekend?"),
+                 ("customer", "Yes, Saturday at 11 works for me."),
+                 ("agent", "Done. I have booked your visit for Saturday at 11 AM. "
+                           "I will send the location on WhatsApp."),
+                 ("customer", "Great, see you then.")],
+    "NOT_INTERESTED": [_GREETING, ("customer", "Who is this?"),
+                       ("agent", "This is Anandita. You had enquired about our homes. "
+                                 "Shall I share the floor plans?"),
+                       ("customer", "No, I have already bought a flat. I am not interested."),
+                       ("agent", "No problem. Thank you for your time.")],
+    "AUTO_CALLBACK": [_GREETING, ("customer", "I am driving right now. Can you call me in the evening?"),
+                      ("agent", "Sure, I will call you back after 6 PM. Drive safe.")],
+    "VIRTUAL_TOUR": [_GREETING, ("customer", "I am abroad right now. Can I see the property online?"),
+                     ("agent", "Of course. I will set up a virtual tour and share the link on WhatsApp."),
+                     ("customer", "Perfect, thanks.")],
+    "DROPPED": [_GREETING, ("customer", "Hello? Who is this?")],
+}
+RECORDING_URL = "/static/demo_recordings"  # served by the CRM from crm/static/demo_recordings
+RECORDING_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "crm", "static", "demo_recordings")
+try:  # where each script line starts in its clip; written by make_recordings.py
+    with open(os.path.join(RECORDING_DIR, "timings.json")) as _f:
+        RECORDING_TIMINGS = json.load(_f)
+except OSError:
+    RECORDING_TIMINGS = {}
 SCHEDULE_STATUS = {"NO_ANSWER": "no_answer", "BUSY": "busy", "NOT_CONNECTED": "failed",
                    "SWITCHED_OFF": "switched_off"}  # anything else -> "completed"
 
@@ -143,36 +182,12 @@ def install():
     return _client
 
 
-def _transcript(rng, outcome, first, project, speaker, start):
-    lines = [(AGENT, f"Hi {first}, this is {AGENT} calling about {project.title()}. Is this a good time?")]
-    if outcome == "DROPPED":
-        lines.append((speaker, "Who is this?"))
-    elif outcome == "AUTO_CALLBACK":
-        lines += [(speaker, "I'm driving, call me in the evening."),
-                  (AGENT, "Sure, I'll call you back after 6 PM.")]
-    else:
-        lines += [(speaker, "Yes, tell me."),
-                  (AGENT, f"Are you looking at 3 or 4 BHK? Prices start around {PRICE_CR[project]} crore."),
-                  (speaker, rng.choice(["3 BHK, budget around two crore.", "4 BHK. When is possession?",
-                                        "Mostly 3 BHK. Is there a clubhouse?"]))]
-        if outcome == "PRE_SITE":
-            lines += [(AGENT, "Would you like to visit the site this weekend?"),
-                      (speaker, rng.choice(["Saturday 11 AM works.", "Sunday evening is fine."])),
-                      (AGENT, "Done, I've booked your visit and will send the location on WhatsApp.")]
-        elif outcome == "NOT_INTERESTED":
-            lines += [(AGENT, "Shall I share the floor plans on WhatsApp?"),
-                      (speaker, rng.choice(["No, I already bought a flat.", "It's above my budget.",
-                                            "I need something closer to my office."]))]
-        elif outcome == "VIRTUAL_TOUR":
-            lines += [(speaker, "I'm abroad right now. Can I see it online?"),
-                      (AGENT, "Of course, I'll share a virtual tour link on WhatsApp.")]
-        else:
-            lines += [(AGENT, "I'll send the brochure and price sheet on WhatsApp."), (speaker, "Okay, thanks.")]
-    out, t = [], start
-    for who, text in lines:
-        t += timedelta(seconds=rng.randint(4, 25))
-        out.append({"speaker": who, "text": text, "ts": t})
-    return out
+def _transcript(outcome, speaker, start):
+    """The call type's fixed script, timestamped where each line is heard in its recording."""
+    lines = CALL_SCRIPTS[outcome]
+    offsets = (RECORDING_TIMINGS.get(outcome) or {}).get("offsets") or [6.0 * n for n in range(len(lines))]
+    return [{"speaker": AGENT if role == "agent" else speaker, "text": text, "ts": start + timedelta(seconds=off)}
+            for (role, text), off in zip(lines, offsets)]
 
 
 def _call_plan(rng, stage, reason):
@@ -216,7 +231,7 @@ def seed(client, n_leads=N_LEADS):
         """One call: transcript, schedule (trigger record) and, if answered, a recording."""
         inbound = outcome == "CONNECTED" and rng.random() < 0.05
         direction = "inbound" if inbound else "outbound"
-        turns = [] if outcome in MISSED else _transcript(rng, outcome, first, project, "91" + phone, t)
+        turns = [] if outcome in MISSED else _transcript(outcome, "91" + phone, t)
         lang = rng.choice(["English", "English", "Hinglish", "Telugu", "Hindi"])
         transcripts.append({"call_sid": sid, "phone_number": "+91" + phone, "project": project,
                             "call_direction": direction, "call_outcome": outcome, "started_at": t,
@@ -226,9 +241,9 @@ def seed(client, n_leads=N_LEADS):
                           "external_schedule_id": esid, "created_at": t, "scheduled_at": t, "called_at": iso(t)})
         if not turns:
             return None
-        dur = (turns[-1]["ts"] - turns[0]["ts"]).total_seconds() + rng.randint(5, 40)
+        dur = (RECORDING_TIMINGS.get(outcome) or {}).get("duration") or 6.0 * len(turns)
         recordings.append({"call_sid": sid, "phone_number": "+91" + phone, "call_status": "completed",
-                           "call_direction": direction, "recording_url": f"https://example.com/recordings/{sid}.mp3",
+                           "call_direction": direction, "recording_url": f"{RECORDING_URL}/{outcome}.m4a",
                            "recording_duration_secs": round(dur), "created_at": t})
         return t, sid, "+91" + phone, project, lang, inbound
 
@@ -307,15 +322,18 @@ def seed(client, n_leads=N_LEADS):
                                 "summary": summary, "is_spam": False, "spam_flags": [], "user_flags": []})
 
         # AI calls, only inside calling hours
-        t = created
-        for n, outcome in enumerate(_call_plan(rng, stage, reason)):
+        t, plan, made = created, _call_plan(rng, stage, reason), 0
+        for n, outcome in enumerate(plan):
             t = _calling_hours(t + timedelta(hours=rng.uniform(2, 30)), rng)
             if t > now:
                 break
+            made += 1
             hit = add_call(f"CA-{i:04d}-{n}", phone, project, outcome, t, first,
                            f"prd-{plid}-{int(t.timestamp() * 1000)}")
             if hit:
                 answered.append(hit)
+        if made < len(plan):  # newer lead: the calls that set its stage haven't happened yet
+            zleads[-1].update(prd_stage="Lead Initiated" if made else "New Lead", not_interested_reason=None)
 
         # WhatsApp thread for ~65% of leads; ~35% of those reply
         if rng.random() < 0.65:
@@ -502,6 +520,14 @@ if __name__ == "__main__":
     assert all(0 <= d["score"] <= 10 for d in qa["health_scores"].find()), "health is out of 10"
     hours = {datetime.fromisoformat(s["called_at"]).astimezone(IST).hour for s in vb["call_schedules"].find()}
     assert hours and min(hours) >= 9 and max(hours) < 21, f"calls outside 9am-9pm IST: {sorted(hours)}"
+    outs = {}
+    for d in vb["call_transcripts"].find():
+        outs.setdefault(d["phone_number"][-10:], set()).add(d["call_outcome"])
+    assert all("PRE_SITE" in outs.get(lead["phone"][-10:], ()) for lead in z["leads"].find(
+        {"prd_stage": {"$in": ["Pre Site Visit", "Post Site Visit"]}})), "booked visit without a booking call"
+    urls = {r["recording_url"] for r in vb["call_recordings"].find()}
+    assert all(os.path.exists(os.path.join(RECORDING_DIR, u.rsplit("/", 1)[1])) for u in urls), "missing recording file"
+    assert set(RECORDING_TIMINGS) == set(CALL_SCRIPTS), "run make_recordings.py"
     assert len(BULK_SHEET) == N_BULK and vb["call_schedules"].count_documents({"call_id": {"$regex": "^BK-"}}) > 0
     print({f"{db}.{name}": c[db][name].count_documents({}) for db, name in [
         ("Zoho_Database", "leads"), ("Zoho_Database", "whatsapp_messages"), ("asbl_loft", "leads"),

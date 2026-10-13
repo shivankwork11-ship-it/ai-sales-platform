@@ -1,0 +1,59 @@
+{
+  "CONNECTED": {
+    "offsets": [
+      0.0,
+      7.0,
+      8.71,
+      12.8,
+      15.64,
+      22.99,
+      24.93
+    ],
+    "duration": 27.49
+  },
+  "PRE_SITE": {
+    "offsets": [
+      0.0,
+      7.0,
+      8.88,
+      13.25,
+      16.57,
+      23.8
+    ],
+    "duration": 25.89
+  },
+  "NOT_INTERESTED": {
+    "offsets": [
+      0.0,
+      7.0,
+      8.34,
+      14.72,
+      19.06
+    ],
+    "duration": 22.22
+  },
+  "AUTO_CALLBACK": {
+    "offsets": [
+      0.0,
+      7.0,
+      11.21
+    ],
+    "duration": 16.18
+  },
+  "VIRTUAL_TOUR": {
+    "offsets": [
+      0.0,
+      7.0,
+      11.25,
+      16.39
+    ],
+    "duration": 18.44
+  },
+  "DROPPED": {
+    "offsets": [
+      0.0,
+      7.0
+    ],
+    "duration": 9.0
+  }
+}
