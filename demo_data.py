@@ -44,10 +44,10 @@ SOURCES = [("Inncircles", "inncircles", "CRM_Push"), ("Meta Ads", "facebook", "M
            ("Housing.com", "housing", "Portal")]
 WEB_CAMPAIGN = {"google": "LOFT_Search_Brand", "facebook": "LOFT_Meta_Leadgen",
                 "instagram": "LOFT_Insta_Reels", "direct": ""}  # website utm source -> campaign
-STAGES = {"New Lead": 25, "Lead Initiated": 38, "Pre Site Visit": 12,
-          "Post Site Visit": 6, "Not Interested": 19}
-NI_REASONS = ["Not Responding", "Declined", "Budget", "Inventory", "Already Purchased",
-              "Location", "Looking for Rent"]
+# The journey each lead is HEADING for. Its CRM stage is then derived from the calls that
+# actually happened by now (_stage_from_calls), so stage and call history always agree.
+TARGETS = {"New Lead": 22, "Lead Initiated": 38, "Pre Site Visit": 14,
+           "Post Site Visit": 7, "Not Interested": 19}
 MISSED = ["NO_ANSWER", "NO_ANSWER", "BUSY", "NOT_CONNECTED", "SWITCHED_OFF"]
 
 # One script per answered call type. make_recordings.py turns each into a real audio
@@ -81,6 +81,13 @@ CALL_SCRIPTS = {
     # outcome NOT_INTERESTED + do-not-call request (the real dialler sets dncTriggered on these)
     "DNC": [_GREETING, ("customer", "Please don't call me again. Remove my number from your list."),
             ("agent", "Understood. I have removed your number. Sorry for the trouble.")],
+    # outcome CONNECTED, placed AFTER the visit date: the post-visit follow-up
+    "POST_VISIT": [("agent", "Hello, this is Anandita. Thank you for visiting the site on Saturday. "
+                             "How did you like the show flat?"),
+                   ("customer", "It was nice. I liked the 3 BHK on a higher floor."),
+                   ("agent", "Great choice. I will share the payment plan and the floor plan "
+                             "for that unit on WhatsApp."),
+                   ("customer", "Okay, thank you.")],
 }
 RECORDING_URL = "/static/demo_recordings"  # served by the CRM from crm/static/demo_recordings
 RECORDING_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "crm", "static", "demo_recordings")
@@ -102,32 +109,56 @@ QUESTIONS = [
     ("Is it RERA approved?", "Yes, the project is RERA registered.", "", ""),
     ("What amenities are there?", "Clubhouse, pool, gym and a kids' play area.", "", ""),
 ]
-WA_OUT = ["Hi {f}, thanks for your interest in {p}. Here is the brochure.",
-          "Hi {f}, sharing the price sheet for {p} as discussed.",
-          "Hi {f}, would you like to book a site visit this weekend?"]
-WA_IN = ["Yes please share floor plans", "What is the price for 3 BHK?", "Call me after 6 pm",
-         "Is the clubhouse ready?", "Saturday works for a visit"]
-WA_INTENT = {"Yes please share floor plans": "floor_plan_request", "What is the price for 3 BHK?": "price_query",
-             "Call me after 6 pm": "callback_request", "Is the clubhouse ready?": "amenity_query",
-             "Saturday works for a visit": "site_visit_request"}
+# WhatsApp is driven by what happened: an intro after the enquiry, then the documents each
+# answered call promised (sent right after it), then the customer's replies to those.
+WA_INTRO = "Hi {f}, thanks for your interest in {p}! I'm Anandita from the sales team. Ask me anything."
+WA_DOCS = {"CONNECTED": ["brochure", "price_sheet"], "PRE_SITE": ["location"],
+           "VIRTUAL_TOUR": ["virtual_tour_link"], "POST_VISIT": ["payment_plan", "floor_plan"]}
+WA_DOC_MSG = {"CONNECTED": "Hi {f}, as discussed, here are the brochure and price sheet for {p}.",
+              "PRE_SITE": "Hi {f}, your site visit is booked for Saturday at 11 AM. Here is the location.",
+              "VIRTUAL_TOUR": "Hi {f}, here is your virtual tour link for {p}.",
+              "POST_VISIT": "Hi {f}, thank you for visiting! Here are the payment plan and floor plan "
+                            "for the unit you liked."}
+WA_REPLY = {  # what the customer texts back after each message, and the intent the CRM classifies
+    "intro": [("What is the price for 3 BHK?", "price_query"), ("Yes please share floor plans", "floor_plan_request")],
+    "CONNECTED": [("Is the clubhouse ready?", "amenity_query"), ("Thanks, I will go through it", "acknowledgement")],
+    "PRE_SITE": [("Thanks, see you on Saturday", "visit_confirmation")],
+    "VIRTUAL_TOUR": [("Got the link, thanks", "acknowledgement")],
+    "POST_VISIT": [("Can you hold that unit for me?", "unit_hold_request")],
+}
+WA_INTENT = {text: intent for replies in WA_REPLY.values() for text, intent in replies}
 
-# QA issue banks: type -> (severity, detail)
-CHAT_ISSUES = {
-    "KB_MISMATCH": ("HIGH", "Bot quoted a starting price that doesn't match the knowledge base."),
-    "INVENTED_FACT": ("HIGH", "Bot claimed a metro station opens next year; not in the knowledge base."),
-    "GUARDRAIL_VIOLATION": ("HIGH", "Bot promised a discount, which it is not allowed to offer."),
-    "INCOMPLETE_RESPONSE": ("MEDIUM", "User asked for RERA and possession; bot only answered possession."),
-    "TONE_ISSUE": ("MEDIUM", "Reply was abrupt after the user raised a budget concern."),
+# Chatbot QA faults are WRITTEN INTO the conversation, so every flagged issue is visible in
+# the chat itself: type -> (severity, user message, faulty bot reply, QA finding). {p}=right price.
+CHAT_FAULTS = {
+    "KB_MISMATCH": ("HIGH", "How much is a 3 BHK?", "3 BHK homes start around {w} crore.",
+                    "Bot quoted {w} crore for a 3 BHK; the knowledge base says {p} crore."),
+    "INVENTED_FACT": ("HIGH", "Is there a metro nearby?", "Yes, a new metro station opens right next to the project next year.",
+                      "Bot claimed a metro station opens next to the project next year; that isn't in the knowledge base."),
+    "GUARDRAIL_VIOLATION": ("HIGH", "Any discount if I book now?", "Yes, I can give you a 5% discount if you book today.",
+                            "Bot offered a 5% discount; only the sales team can offer discounts."),
+    "INCOMPLETE_RESPONSE": ("MEDIUM", "Is it RERA approved, and when is possession?",
+                            "Possession is planned for December 2027.",
+                            "User asked about RERA and possession; bot only answered possession."),
+    "TONE_ISSUE": ("MEDIUM", "This is above my budget.", "Prices are fixed.",
+                   "Bot replied curtly when the user raised a budget concern."),
 }
+# Voice QA findings that fit what is actually said in each call script (recordings are fixed).
 VOICE_ISSUES = {
-    "DECIMAL_NUMBER": ("HIGH", "Said 'one ninety crore' instead of 'one point nine crore'."),
-    "KB_MISMATCH": ("HIGH", "Agent gave the wrong possession date."),
-    "INVENTED_FACT": ("HIGH", "Agent said a school is inside the campus; not in the knowledge base."),
-    "LANGUAGE_HANDLING": ("MEDIUM", "Customer switched to Telugu; agent kept replying in English."),
-    "INCOMPLETE_RESPONSE": ("MEDIUM", "Customer asked about parking; agent moved on without answering."),
-}
-LOW_ISSUE = {"chatbot": ("MINOR_PHRASING", "Repeated the same sentence twice in one reply."),
-             "voice": ("YEAR_FORMAT", "Read 2027 as 'two zero two seven'.")}
+    "CONNECTED": ("INCOMPLETE_RESPONSE", "MEDIUM",
+                  "Customer chose a 3 BHK, but the agent never asked about budget before sending the price sheet."),
+    "PRE_SITE": ("INCOMPLETE_RESPONSE", "MEDIUM", "Booked the visit without confirming how many people are coming."),
+    "NOT_INTERESTED": ("INCOMPLETE_RESPONSE", "MEDIUM",
+                       "Customer had already bought; the agent didn't offer updates on future projects."),
+    "AUTO_CALLBACK": ("INCOMPLETE_RESPONSE", "MEDIUM", "Agreed to call back 'after 6 PM' without confirming an exact time."),
+    "VIRTUAL_TOUR": ("INCOMPLETE_RESPONSE", "MEDIUM",
+                     "Promised a virtual tour link without confirming the customer's time zone."),
+    "DROPPED": ("TONE_ISSUE", "MEDIUM", "The opening line was long; the customer hung up before hearing why we called."),
+    "POST_VISIT": ("INCOMPLETE_RESPONSE", "MEDIUM",
+                   "Customer liked a higher-floor 3 BHK; the agent didn't offer to hold the unit."),
+}  # the DNC call was handled correctly, so it never fails
+CHAT_LOW = ("MINOR_PHRASING", "LOW", "Repeated the same sentence twice in one reply.")
+VOICE_LOW = {"CONNECTED": ("YEAR_FORMAT", "LOW", "Read 2027 as 'two zero two seven'.")}
 SPAM_TEXT = {  # spam filter category -> a junk website message
     "JOB_QUERY": "Are you hiring? I want a job in sales.",
     "PROMO_SCAM": "Earn 50,000 per day from home!! Reply YES to join.",
@@ -147,22 +178,18 @@ FIX = {  # issue type -> (change type, where, fix)
                             "Answer every part of a multi-part question before moving on."),
     "TONE_ISSUE": ("PROMPT_UPDATE", "knowledge_base/webbot/05_kb_persona_playbook.md",
                    "Acknowledge budget concerns before suggesting alternatives."),
-    "DECIMAL_NUMBER": ("PROMPT_UPDATE", "knowledge_base/anandita/system_prompt.md",
-                       "Add examples: 1.9 crore -> 'one point nine crore'."),
-    "LANGUAGE_HANDLING": ("PROMPT_UPDATE", "knowledge_base/anandita/system_prompt.md",
-                          "Switch language when the customer does, within one turn."),
-    # voice-agent versions of shared issue types point at the voice agent's own files
-    ("KB_MISMATCH", "voice"): ("KB_UPDATE", "knowledge_base/anandita/project_facts.md",
-                               "Correct the possession date in the voice agent's project facts."),
-    ("INVENTED_FACT", "voice"): ("PROMPT_UPDATE", "knowledge_base/anandita/system_prompt.md",
-                                 "Add a rule: if a fact is not in project_facts.md, say you'll confirm and call back."),
+    # voice-agent versions point at the voice agent's own files
     ("INCOMPLETE_RESPONSE", "voice"): ("PROMPT_UPDATE", "knowledge_base/anandita/qa_checklist.md",
-                                       "Check every customer question is answered before closing the call."),
+                                       "Before closing, confirm the details the next step needs (budget, "
+                                       "attendees, exact time, time zone)."),
+    ("TONE_ISSUE", "voice"): ("PROMPT_UPDATE", "knowledge_base/anandita/system_prompt.md",
+                              "Shorten the opening: say who is calling and why in one sentence."),
 }
 
 N_BULK = 60  # cold-call numbers for the Bulk Calls tab (on top of the 1,000 leads)
 BULK_OUTCOMES = ["CONNECTED", "NOT_INTERESTED", "AUTO_CALLBACK", "PRE_SITE"]
 BULK_SHEET = []  # filled by seed(): the campaign sheet rows demo.py uploads
+BULK_STAGES = []  # filled by seed(): (bulk lead id, stage, reason) demo.py sets after the upload
 ZOHO_EXPORT = []  # filled by seed(): rows of the daily Zoho lead export CSV (ANGAD imports it)
 IST = timezone(timedelta(hours=5, minutes=30))
 
@@ -197,72 +224,171 @@ def _transcript(outcome, speaker, start):
             for (role, text), off in zip(lines, offsets)]
 
 
-def _call_plan(rng, stage, reason):
-    """Call outcomes in order, consistent with the lead's CRM stage."""
-    miss = lambda k: [rng.choice(MISSED) for _ in range(k)]
-    if stage == "New Lead":
-        return miss(rng.choice([0, 0, 1, 2]))
-    if stage == "Lead Initiated":
-        return miss(rng.randint(0, 4)) + [rng.choice(["CONNECTED", "AUTO_CALLBACK", "DROPPED", "VIRTUAL_TOUR"])]
-    if stage == "Pre Site Visit":
-        return miss(rng.randint(0, 3)) + ["CONNECTED", "PRE_SITE"]
-    if stage == "Post Site Visit":
-        return miss(rng.randint(0, 2)) + ["PRE_SITE", "CONNECTED"]
-    if reason == "Not Responding":
+def _call_plan(rng, target):
+    """[(outcome, script)] the dialler will attempt for a lead heading to `target`."""
+    miss = lambda k: [(rng.choice(MISSED), None) for _ in range(k)]
+    if target == "New Lead":
+        return []
+    if target == "Lead Initiated":
+        plan = miss(rng.randint(0, 4)) + [(rng.choice(["CONNECTED", "AUTO_CALLBACK", "DROPPED"]), None)]
+        if plan[-1][0] == "AUTO_CALLBACK" and rng.random() < 0.5:
+            plan.append(("CONNECTED", None))  # the promised call back, after 6 PM
+        return plan
+    if target == "Pre Site Visit":
+        return miss(rng.randint(0, 3)) + [(rng.choice(["PRE_SITE", "PRE_SITE", "PRE_SITE", "VIRTUAL_TOUR"]), None)]
+    if target == "Post Site Visit":
+        return miss(rng.randint(0, 2)) + [("PRE_SITE", None), ("CONNECTED", "POST_VISIT")]
+    if target == "Not Responding":
         return miss(rng.randint(3, 6))
-    return miss(rng.randint(0, 3)) + ["NOT_INTERESTED"]
+    return miss(rng.randint(0, 3)) + [("NOT_INTERESTED", "DNC" if rng.random() < 0.25 else None)]
 
 
-def _verdict(rng, bank, kind):
-    """A QA agent verdict: ~25% FAIL with real-looking issues."""
-    if rng.random() < 0.25:
-        types = rng.sample(sorted(bank), k=rng.choice([1, 1, 2]))
-        issues = [{"type": t, "severity": bank[t][0], "detail": bank[t][1]} for t in types]
-        summary = f"Failed: {issues[0]['detail']}"
-        return "FAIL", rng.randint(2, 6), issues, summary
-    issues = []
-    if rng.random() < 0.15:
-        t, d = LOW_ISSUE[kind]
-        issues = [{"type": t, "severity": "LOW", "detail": d}]
-    return "PASS", rng.randint(7, 10), issues, "Answered accurately and offered a clear next step."
+def _stage_from_calls(made, not_responding=False):
+    """CRM stage + Not Interested reason implied by the calls that actually happened."""
+    if not made:
+        return "New Lead", None
+    answered = [m for m in made if m["outcome"] not in MISSED]
+    if answered and answered[-1]["outcome"] == "NOT_INTERESTED":
+        return "Not Interested", ("Declined" if answered[-1]["key"] == "DNC" else "Already Purchased")
+    if any(m["key"] == "POST_VISIT" for m in made):
+        return "Post Site Visit", None
+    if any(m["outcome"] in ("PRE_SITE", "VIRTUAL_TOUR") for m in made):
+        return "Pre Site Visit", None  # an in-person visit or a virtual tour is booked
+    if not answered and not_responding and len(made) >= 3:
+        return "Not Interested", "Not Responding"
+    return "Lead Initiated", None
+
+
+def _callback_time(t, rng):
+    """'Call me after 6 PM': the same evening (or the next one if it's already late)."""
+    local = t.astimezone(IST)
+    day = local.date() + timedelta(days=0 if local.hour < 18 else 1)
+    return (datetime(day.year, day.month, day.day, 18, tzinfo=IST) + timedelta(minutes=rng.uniform(5, 150))
+            ).astimezone(timezone.utc)
+
+
+def _next_saturday_11am(t):
+    local = t.astimezone(IST)
+    day = local.date() + timedelta(days=(5 - local.weekday()) % 7 or 7)
+    return datetime(day.year, day.month, day.day, 11, tzinfo=IST).astimezone(timezone.utc)
 
 
 def seed(client, n_leads=N_LEADS):
     rng = random.Random(42)  # same data on every start, in every app
     now = datetime.now(timezone.utc)
     iso = lambda d: d.isoformat()
-    zleads, wa, transcripts, recordings, schedules = [], [], [], [], []
+    zleads, wa, transcripts, recordings, schedules, doc_sends = [], [], [], [], [], []
     loft_leads, vlogs, convs, events, chat_qa, answered = [], [], [], [], [], []
 
-    def add_call(sid, phone, project, outcome, t, first, esid, provider="plivo", script=None):
+    def add_call(sid, phone, project, outcome, t, esid, provider="plivo", script=None):
         """One call: transcript, schedule (trigger record) and, if answered, a recording."""
-        key = script or outcome  # which script/recording; differs from outcome only for DNC
-        inbound = outcome == "CONNECTED" and rng.random() < 0.05
+        key = script or outcome  # which script/recording (differs from the outcome for DNC/POST_VISIT)
+        inbound = outcome == "CONNECTED" and key == "CONNECTED" and rng.random() < 0.05
         direction = "inbound" if inbound else "outbound"
         turns = [] if outcome in MISSED else _transcript(key, "91" + phone, t)
-        lang = rng.choice(["English", "English", "Hinglish", "Telugu", "Hindi"])
         transcripts.append({"call_sid": sid, "phone_number": "+91" + phone, "project": project,
                             "call_direction": direction, "call_outcome": outcome, "started_at": t,
-                            "transcript": turns, "language": lang, "dnc": key == "DNC"})
+                            "transcript": turns, "language": "English", "script": key if turns else None})
         schedules.append({"to": "+91" + phone, "call_id": sid, "call_outcome": outcome,
                           "status": SCHEDULE_STATUS.get(outcome, "completed"), "metadata": {"project": project},
                           "provider": provider,  # telnyx = international (NRI) line, plivo = India (RI)
                           "external_schedule_id": esid, "created_at": t, "scheduled_at": t, "called_at": iso(t)})
-        if not turns:
-            return None
-        dur = (RECORDING_TIMINGS.get(key) or {}).get("duration") or 6.0 * len(turns)
-        recordings.append({"call_sid": sid, "phone_number": "+91" + phone, "call_status": "completed",
-                           "call_direction": direction, "recording_url": f"{RECORDING_URL}/{key}.m4a",
-                           "recording_duration_secs": round(dur), "created_at": t})
-        return t, sid, "+91" + phone, project, lang, inbound
+        dur = 0
+        if turns:
+            dur = (RECORDING_TIMINGS.get(key) or {}).get("duration") or 6.0 * len(turns)
+            recordings.append({"call_sid": sid, "phone_number": "+91" + phone, "call_status": "completed",
+                               "call_direction": direction, "recording_url": f"{RECORDING_URL}/{key}.m4a",
+                               "recording_duration_secs": round(dur), "created_at": t})
+            answered.append((t, sid, "+91" + phone, project, inbound, key))
+        return {"outcome": outcome, "key": key, "t": t, "dur": dur, "sid": sid}
+
+    def make_calls(prefix, phone, project, plan, start, esid_of, provider="plivo"):
+        """Place the planned calls in calling hours, up to now; returns what actually happened."""
+        made, t, visit = [], start, None
+        for n, (outcome, script) in enumerate(plan):
+            if script == "POST_VISIT":
+                t = _calling_hours(visit + timedelta(hours=rng.uniform(20, 60)), rng)
+            elif made and made[-1]["outcome"] == "AUTO_CALLBACK":
+                t = _callback_time(made[-1]["t"], rng)
+            else:
+                t = _calling_hours(t + timedelta(hours=rng.uniform(2, 30)), rng)
+            if t > now:
+                break
+            made.append(add_call(f"{prefix}-{n}", phone, project, outcome, t, esid_of(t), provider, script))
+            if outcome == "PRE_SITE":
+                visit = _next_saturday_11am(t)
+        return made
+
+    def whatsapp(phone, first, project, created, made):
+        """The WhatsApp thread implied by the calls: intro, promised documents, replies.
+        Nothing is sent after the customer says they're not interested or asks not to be contacted."""
+        stop = next((m["t"] for m in made if m["outcome"] == "NOT_INTERESTED"), None)
+        msgs = []  # (time, direction, text)
+        def reply(after, context):
+            if rng.random() < 0.4:
+                msgs.append((after + timedelta(minutes=rng.uniform(2, 240)), "inbound", rng.choice(WA_REPLY[context])[0]))
+        if rng.random() < 0.65:
+            ti = _calling_hours(created + timedelta(hours=rng.uniform(0.5, 6)), rng)
+            msgs.append((ti, "outbound", WA_INTRO.format(f=first, p=project.title())))
+            reply(ti, "intro")
+        for m in made:
+            if m["key"] not in WA_DOCS:
+                continue
+            ts = m["t"] + timedelta(seconds=m["dur"] + 30)
+            blocked = rng.random() < 0.1
+            for d in WA_DOCS[m["key"]]:
+                doc_sends.append({"phone": "+91" + phone, "project": project, "doc_type": d, "call_sid": m["sid"],
+                                  "created_at": ts, "outcome": "blocked" if blocked else "sent",
+                                  "block_reason": "outside the 24-hour WhatsApp window" if blocked else None,
+                                  "matched_file": None if blocked else f"{project.title()}_{d}.pdf"})
+            if not blocked:
+                msgs.append((ts, "outbound", WA_DOC_MSG[m["key"]].format(f=first, p=project.title())))
+                reply(ts, m["key"])
+        msgs = sorted(x for x in msgs if x[0] <= now and (stop is None or x[0] < stop))
+        if msgs:
+            by_date = {}
+            for when, direction, text in msgs:
+                day = by_date.setdefault(when.astimezone(IST).strftime("%Y-%m-%d"), {"inbound": [], "outbound": []})
+                day[direction].append({"msg": text, "time": iso(when)})
+            wa.append({"_id": "91" + phone, "phone": "91" + phone, "last_message_at": iso(msgs[-1][0]),
+                       "by_date": by_date})
+
+    def chat(price, t):
+        """One website chatbot conversation + its QA verdict (faults are written into the chat)."""
+        spam = rng.choice(sorted(SPAM_TEXT)) if rng.random() < 0.06 else None
+        if spam:
+            return ([(SPAM_TEXT[spam], "I can help with questions about our homes. What would you like to know?", None)],
+                    {"status": "SKIPPED", "skip_reason": "SPAM_FILTERED", "is_spam": True, "score": None, "issues": [],
+                     "spam_flags": [{"turn": 1, "type": spam, "layer": 1, "text": SPAM_TEXT[spam]}],
+                     "summary": "Skipped by spam filter."})
+        faults = rng.sample(sorted(CHAT_FAULTS), k=rng.choice([1, 1, 2])) if rng.random() < 0.25 else []
+        turns = [(q, a.format(p=price), (art, label) if art and rng.random() < 0.5 else None)
+                 for q, a, art, label in rng.sample(QUESTIONS, k=rng.randint(2, 4))]
+        issues = []
+        for f in faults:
+            sev, user, bot, finding = CHAT_FAULTS[f]
+            vals = {"p": price, "w": round(price - 0.3, 1)}
+            turns.insert(rng.randint(0, len(turns)), (user, bot.format(**vals), None))
+            issues.append({"type": f, "severity": sev, "detail": finding.format(**vals)})
+        if faults:
+            return turns, {"status": "FAIL", "score": rng.randint(2, 6), "issues": issues,
+                           "summary": f"Failed: {issues[0]['detail']}"}
+        if rng.random() < 0.15:  # a small slip that doesn't fail the conversation
+            n = rng.randrange(len(turns))
+            q, a, cta = turns[n]
+            turns[n] = (q, f"{a} {a}", cta)
+            issues = [dict(zip(("type", "severity", "detail"), CHAT_LOW))]
+        return turns, {"status": "PASS", "score": rng.randint(7, 10), "issues": issues,
+                       "summary": "Answered accurately and offered a clear next step."}
 
     for i in range(n_leads):
         first, last = rng.choice(FIRST), rng.choice(LAST)
         phone = f"74{i:08d}"  # obviously fake, unique 10-digit numbers
         website = i < N_WEBSITE
         project = "LOFT" if website else rng.choice(PROJECTS)
-        stage = rng.choices(list(STAGES), weights=list(STAGES.values()))[0]
-        reason = rng.choice(NI_REASONS) if stage == "Not Interested" else None
+        target = rng.choices(list(TARGETS), weights=list(TARGETS.values()))[0]
+        if target == "Not Interested" and rng.random() < 0.3:
+            target = "Not Responding"
         created = now - timedelta(days=rng.uniform(0.3, 45))
         lead_source, utm, camp = rng.choice(SOURCES)
         plid = f"{1000 + i}-{project}"
@@ -270,18 +396,6 @@ def seed(client, n_leads=N_LEADS):
         provider = "telnyx" if rng.random() < 0.06 else "plivo"
         web_src = rng.choice(list(WEB_CAMPAIGN)) if website else None
         campaign = WEB_CAMPAIGN[web_src] if website else f"{project}_{camp}"
-
-        # CRM record (Zoho). Website leads also get one, so they carry a stage.
-        zleads.append({
-            "_id": plid, "phone": "91" + phone, "first_name": first, "last_name": last,
-            "project": project, "prd_stage": stage, "not_interested_reason": reason,
-            "lead_source": "Website" if website else lead_source,
-            "utm_source": "website" if website else utm, "utm_campaign": campaign,
-            "campaign_name": campaign, "created_at": created, "lead_received_at": created,
-            "source_lead_id": f"SRC-{500000 + i}", "mlid": str(700000 + i), "bot_enabled": True,
-            "zoho_lead_id": zid, "plid": plid, "stage": stage, "born_date": created.strftime("%Y-%m-%d"),
-            "chatbot_status": rng.choice(["NA", "CF", "SF"]), "call_status": "SS",
-        })
 
         if website:  # website lead + chatbot conversations + browsing sessions
             # Real Mongo ids start with their creation time; plain ObjectId() would give
@@ -294,112 +408,86 @@ def seed(client, n_leads=N_LEADS):
             vlogs.append({"visitorId": vid, "leadId": oid})
             for s in range(rng.randint(1, 5)):
                 st = created + timedelta(hours=rng.uniform(0, 72))
-                events.append({"leadId": oid, "visitorId": vid, "startedAt": st,
-                               "endedAt": st + timedelta(minutes=rng.uniform(1, 15))})
+                if st < now:
+                    events.append({"leadId": oid, "visitorId": vid, "startedAt": st,
+                                   "endedAt": min(st + timedelta(minutes=rng.uniform(1, 15)), now)})
             for c in range(rng.randint(1, 3)):
                 t = created - timedelta(minutes=rng.uniform(1, 30)) + timedelta(days=c * rng.uniform(0, 3))
                 if t > now:
                     break
                 cid = f"c-{int(t.timestamp() * 1000)}-{i:04d}{c}"
+                turns, verdict = chat(PRICE_CR[project], t)
                 depth, start = [], t
-                spam = rng.choice(sorted(SPAM_TEXT)) if rng.random() < 0.06 else None
-                if spam:  # one junk message; the spam filter skips these before QA
+                for user, bot, cta in turns:
                     t += timedelta(seconds=rng.randint(10, 90))
-                    depth.append({"userText": SPAM_TEXT[spam], "userAt": t, "botAt": t + timedelta(seconds=3),
-                                  "botText": "I can help with questions about our homes. What would you like to know?"})
-                for q, a, art, label in ([] if spam else rng.sample(QUESTIONS, k=rng.randint(2, 5))):
-                    t += timedelta(seconds=rng.randint(10, 90))
-                    depth.append({"userText": q, "botText": a.format(p=PRICE_CR[project]),
-                                  "userAt": t, "botAt": t + timedelta(seconds=3)})
-                    if art and rng.random() < 0.5:
+                    depth.append({"userText": user, "botText": bot, "userAt": t, "botAt": t + timedelta(seconds=3)})
+                    if cta:
                         t += timedelta(seconds=20)
-                        depth.append({"isCtaTrigger": True, "artifact": art, "artifactLabel": label,
-                                      "userText": "Yes please", "botText": f"Here you go: {label}.",
+                        depth.append({"isCtaTrigger": True, "artifact": cta[0], "artifactLabel": cta[1],
+                                      "userText": "Yes please", "botText": f"Here you go: {cta[1]}.",
                                       "userAt": t, "botAt": t + timedelta(seconds=2)})
                 convs.append({"conversationId": cid, "leadId": oid, "visitorId": vid,
                               "createdAt": start, "conversationDepth": depth})
-                evaluated = min(start + timedelta(hours=rng.uniform(0.5, 4)), now)
-                base = {"conversation_id": cid, "turn_count": len(depth), "visitor_id": vid,
-                        "lead_id": str(oid), "conversation_date": iso(start), "evaluated_at": iso(evaluated),
-                        "confidence": round(rng.uniform(0.7, 0.98), 2),
-                        "token_usage": {"input": rng.randint(9000, 12000), "output": rng.randint(150, 600)}}
-                if spam:  # same flag shape as spam_filter.flag_conversation
-                    chat_qa.append({**base, "status": "SKIPPED", "skip_reason": "SPAM_FILTERED", "is_spam": True,
-                                    "spam_flags": [{"turn": 1, "type": spam, "layer": 1, "text": SPAM_TEXT[spam]}],
-                                    "issues": [],
-                                    "summary": "Skipped by spam filter.", "score": None})
-                    continue
-                status, score, issues, summary = _verdict(rng, CHAT_ISSUES, "chatbot")
-                chat_qa.append({**base, "status": status, "score": score, "issues": issues,
-                                "summary": summary, "is_spam": False, "spam_flags": [], "user_flags": []})
+                chat_qa.append({"conversation_id": cid, "turn_count": len(depth), "visitor_id": vid,
+                                "lead_id": str(oid), "conversation_date": iso(start),
+                                "evaluated_at": iso(min(start + timedelta(hours=rng.uniform(0.5, 4)), now)),
+                                "confidence": round(rng.uniform(0.7, 0.98), 2),
+                                "token_usage": {"input": rng.randint(9000, 12000), "output": rng.randint(150, 600)},
+                                "is_spam": False, "spam_flags": [], "user_flags": [], **verdict})
 
-        # AI calls, only inside calling hours
-        t, plan, made = created, _call_plan(rng, stage, reason), []
-        dnc = stage == "Not Interested" and reason != "Not Responding" and rng.random() < 0.25
-        for n, outcome in enumerate(plan):
-            t = _calling_hours(t + timedelta(hours=rng.uniform(2, 30)), rng)
-            if t > now:
-                break
-            made.append(outcome)
-            hit = add_call(f"CA-{i:04d}-{n}", phone, project, outcome, t, first,
-                           f"prd-{zid}-{int(t.timestamp() * 1000)}", provider,
-                           "DNC" if dnc and outcome == "NOT_INTERESTED" else None)
-            if hit:
-                answered.append(hit)
-        if len(made) < len(plan):  # newer lead: the calls that set its stage haven't all happened yet
-            fallback = "Pre Site Visit" if "PRE_SITE" in made else "Lead Initiated" if made else "New Lead"
-            zleads[-1].update(prd_stage=fallback, stage=fallback, not_interested_reason=None)
+        # AI calls, then the stage + reason they imply, then the WhatsApp they imply
+        made = make_calls(f"CA-{i:04d}", phone, project, _call_plan(rng, target), created,
+                          lambda t: f"prd-{zid}-{int(t.timestamp() * 1000)}", provider)
+        stage, reason = _stage_from_calls(made, target == "Not Responding")
+        whatsapp(phone, first, project, created, made)
 
-        # WhatsApp thread for ~65% of leads; ~35% of those reply
-        if rng.random() < 0.65:
-            by_date, last_at, d = {}, None, created + timedelta(hours=rng.uniform(1, 12))
-            for _ in range(rng.randint(1, 4)):
-                if d > now:
-                    break
-                day = by_date.setdefault(d.strftime("%Y-%m-%d"), {"inbound": [], "outbound": []})
-                day["outbound"].append({"msg": rng.choice(WA_OUT).format(f=first, p=project.title()), "time": iso(d)})
-                last_at = d
-                if rng.random() < 0.35:
-                    r = d + timedelta(minutes=rng.uniform(2, 240))
-                    if r <= now:
-                        day["inbound"].append({"msg": rng.choice(WA_IN), "time": iso(r)})
-                        last_at = r
-                d += timedelta(days=rng.uniform(0.5, 3))
-            if by_date:
-                wa.append({"_id": "91" + phone, "phone": "91" + phone, "last_message_at": iso(last_at),
-                           "by_date": by_date})
+        # CRM record (Zoho). Website leads also get one, so they carry a stage.
+        zleads.append({
+            "_id": plid, "phone": "91" + phone, "first_name": first, "last_name": last,
+            "project": project, "prd_stage": stage, "stage": stage, "not_interested_reason": reason,
+            "lead_source": "Website" if website else lead_source,
+            "utm_source": "website" if website else utm, "utm_campaign": campaign,
+            "campaign_name": campaign, "created_at": created, "lead_received_at": created,
+            "source_lead_id": f"SRC-{500000 + i}", "mlid": str(700000 + i), "bot_enabled": not reason,
+            "zoho_lead_id": zid, "plid": plid, "born_date": created.strftime("%Y-%m-%d"),
+            "chatbot_status": rng.choice(["NA", "CF", "SF"]), "call_status": "SS",
+        })
 
     # Bulk cold-call campaign: numbers that exist only in the call logs. demo.py uploads
-    # BULK_SHEET through the CRM's real upload route, which builds these leads.
+    # BULK_SHEET through the CRM's real upload route, then sets each lead's stage from its calls.
     BULK_SHEET.clear()
+    BULK_STAGES.clear()
     for j in range(N_BULK):
         first, last = rng.choice(FIRST), rng.choice(LAST)
         phone, project = f"75{j:08d}", rng.choice(PROJECTS)
         BULK_SHEET.append({"Phone": phone, "Project": project, "Name": f"{first} {last}", "Lead ID": f"BLK-{3000 + j}"})
-        t = now - timedelta(days=rng.uniform(1, 20))
-        for n in range(rng.randint(1, 4)):
-            t = _calling_hours(t + timedelta(hours=rng.uniform(3, 48)), rng)
-            if t > now:
-                break
-            add_call(f"BK-{j:04d}-{n}", phone, project, rng.choice(MISSED + BULK_OUTCOMES), t, first,
-                     f"dash_bulk-{j}-{n}")
+        plan = [(rng.choice(MISSED), None) for _ in range(rng.randint(0, 3))] + [(rng.choice(BULK_OUTCOMES), None)]
+        made = make_calls(f"BK-{j:04d}", phone, project, plan, now - timedelta(days=rng.uniform(1, 20)),
+                          lambda t, j=j: f"dash_bulk-{j}-{int(t.timestamp())}")
+        BULK_STAGES.append((f"BULK-{phone}-{project.lower()}", *_stage_from_calls(made)))
 
-    # Voice QA: the most recent answered calls
+    # Voice QA: the most recent answered calls, judged on what is actually said in each script
     voice_qa = []
-    for t, sid, ph, project, lang, inbound in sorted(answered, reverse=True)[:N_VOICE_QA]:
-        status, score, issues, summary = _verdict(rng, VOICE_ISSUES, "voice")
+    for t, sid, ph, project, inbound, key in sorted(answered, reverse=True)[:N_VOICE_QA]:
+        if key in VOICE_ISSUES and rng.random() < 0.25:
+            itype, sev, detail = VOICE_ISSUES[key]
+            status, score, issues, summary = "FAIL", rng.randint(4, 6), [{"type": itype, "severity": sev,
+                                                                           "detail": detail}], f"Failed: {detail}"
+        else:
+            low = VOICE_LOW.get(key) if rng.random() < 0.15 else None
+            status, score, summary = "PASS", rng.randint(7, 10), "Handled the call correctly and set a clear next step."
+            issues = [dict(zip(("type", "severity", "detail"), low))] if low else []
         voice_qa.append({
             "call_sid": sid, "phone_number": ph, "call_direction": "inbound" if inbound else "outbound",
-            "language_used": lang, "project": project, "status": status, "score": score,
+            "language_used": "English", "project": project, "status": status, "score": score,
             "confidence": round(rng.uniform(0.7, 0.98), 2), "issues": issues, "summary": summary,
-            "language_compliance": "FAIL" if any(x["type"] == "LANGUAGE_HANDLING" for x in issues) else "PASS",
-            "is_spam": False, "conversation_date": iso(t),
+            "language_compliance": "PASS", "is_spam": False, "conversation_date": iso(t),
             "evaluated_at": iso(min(t + timedelta(hours=rng.uniform(0.5, 4)), now)),
             "token_usage": {"input": rng.randint(4000, 7000), "output": rng.randint(150, 500)},
         })
 
     runs = _agent_runs(rng, now, chat_qa, voice_qa, zleads)
-    angad = _angad_sources(rng, now, zleads, transcripts, schedules, recordings, wa, loft_leads, events)
+    angad = _angad_sources(rng, now, zleads, transcripts, schedules, recordings, wa, loft_leads, events, doc_sends)
 
     zoho, loft, vb, qa = client["Zoho_Database"], client["asbl_loft"], client["ASBLVoiceBot"], client["qa_results"]
     for col, docs in [(zoho["leads"], zleads), (zoho["whatsapp_messages"], wa),
@@ -426,6 +514,7 @@ CALL_SUMMARY = {
     "VIRTUAL_TOUR": "Customer is abroad and asked for a virtual tour; link to be shared on WhatsApp.",
     "DROPPED": "Call dropped right after the greeting.",
     "DNC": "Customer asked not to be called again; number removed from the calling list.",
+    "POST_VISIT": "Customer visited the site, liked a higher-floor 3 BHK; payment plan and floor plan sent on WhatsApp.",
 }
 CALL_INTENT = {  # the post-call intent model's read of each script
     "CONNECTED": ("buy_home", "moderate", "positive", "qualification", "medium", "not_discussed",
@@ -442,21 +531,16 @@ CALL_INTENT = {  # the post-call intent model's read of each script
                 "Retry the call", "dropped", "agent_only"),
     "DNC": ("not_interested", "none", "negative", "greeting", "low", "declined",
             "Do not call again (customer request)", "disengaged", "balanced"),
+    "POST_VISIT": ("buy_home", "strong", "positive", "closing", "high", "visited",
+                   "Share payment plan and floor plan; offer to hold the unit", "highly_engaged", "balanced"),
 }
-WA_DOCS = {"CONNECTED": ["brochure", "price_sheet"], "PRE_SITE": ["location"], "VIRTUAL_TOUR": ["virtual_tour_link"]}
 CALL_STATUS = {"NO_ANSWER": "no-answer", "BUSY": "busy", "NOT_CONNECTED": "failed", "SWITCHED_OFF": "failed"}
 CRM_STAGE = {"New Lead": "new", "Lead Initiated": "contacted", "Pre Site Visit": "visit_scheduled",
              "Post Site Visit": "visit_done", "Not Interested": "not_interested"}
 BUDGETS = ["1-1.5 Cr", "1.5-2 Cr", "2-3 Cr", "3 Cr+"]
 
 
-def _next_saturday_11am(t):
-    local = t.astimezone(IST)
-    day = local.date() + timedelta(days=(5 - local.weekday()) % 7 or 7)
-    return datetime(day.year, day.month, day.day, 11, tzinfo=IST).astimezone(timezone.utc)
-
-
-def _angad_sources(rng, now, zleads, transcripts, schedules, recordings, wa, loft_leads, events):
+def _angad_sources(rng, now, zleads, transcripts, schedules, recordings, wa, loft_leads, events, doc_sends):
     out = {k: [] for k in [
         ("angad", "calls"), ("angad", "leads"), ("angad", "scheduledcalls"),
         ("ASBLVoiceBot", "call_transcript_intent_identification"),
@@ -466,7 +550,15 @@ def _angad_sources(rng, now, zleads, transcripts, schedules, recordings, wa, lof
         ("Intelligent_CRM", "persons"), ("Intelligent_CRM", "crm_leads"),
         ("Intelligent_CRM", "site_visits"), ("Intelligent_CRM", "lead_events"), ("Intelligent_CRM", "messages")]}
     lead_by_phone = {z["phone"][-10:]: z for z in zleads}
-    dnc_phones = {tx["phone_number"][-10:] for tx in transcripts if tx.get("dnc")}
+    dnc_phones = {tx["phone_number"][-10:] for tx in transcripts if tx["script"] == "DNC"}
+    sent_docs = {}
+    for d in doc_sends:
+        if d["outcome"] == "sent":
+            sent_docs.setdefault(d["call_sid"], []).append(d["doc_type"])
+    out[("Zoho_Database", "doc_send_log")] = doc_sends
+    calls_by_phone = {}
+    for tx in transcripts:
+        calls_by_phone.setdefault(tx["phone_number"][-10:], []).append(tx)
     esid = {s["call_id"]: s["external_schedule_id"] for s in schedules}
     rec = {r["call_sid"]: r for r in recordings}
     booking_call = {tx["call_sid"]: _next_saturday_11am(tx["started_at"]) for tx in transcripts
@@ -501,7 +593,8 @@ def _angad_sources(rng, now, zleads, transcripts, schedules, recordings, wa, lof
         {"project": pr, "doc_type": d, "filename": f"{pr.title()}_{d}.pdf", "size_label": size,
          "applies_to_all": size == ""}
         for pr in PROJECTS for d, size in (("brochure", ""), ("price_sheet", ""), ("floor_plan", "3 BHK"),
-                                           ("floor_plan", "4 BHK"), ("location", ""), ("virtual_tour_link", ""))]
+                                           ("floor_plan", "4 BHK"), ("location", ""), ("virtual_tour_link", ""),
+                                           ("payment_plan", ""))]
     # WhatsApp: per-thread totals on the Zoho doc + one CRM message record per message
     for w in wa:
         lead = lead_by_phone.get(w["_id"][-10:])
@@ -535,7 +628,7 @@ def _angad_sources(rng, now, zleads, transcripts, schedules, recordings, wa, lof
         r = rec.get(sid)
         dur = r["recording_duration_secs"] if r else None
         answered = bool(tx["transcript"])
-        key = "DNC" if tx.get("dnc") else oc
+        key = tx["script"] or oc
         doc = {
             "roomName": sid, "phoneNumber": tx["phone_number"], "direction": tx["call_direction"],
             "status": CALL_STATUS.get(oc, "completed"), "outcome": oc, "startedAt": t,
@@ -548,34 +641,36 @@ def _angad_sources(rng, now, zleads, transcripts, schedules, recordings, wa, lof
             "summary": CALL_SUMMARY.get(key), "recordingUrl": r["recording_url"] if r else None,
             "metadata": {"project": tx["project"]}, "dncTriggered": key == "DNC",
             "sentiment": CALL_INTENT[key][2] if answered else None,
-            "closingScore": ({"PRE_SITE": rng.randint(80, 95), "CONNECTED": rng.randint(50, 75),
-                              "VIRTUAL_TOUR": rng.randint(55, 75)}.get(key, rng.randint(5, 30))
+            "closingScore": ({"PRE_SITE": rng.randint(80, 95), "POST_VISIT": rng.randint(80, 95),
+                              "CONNECTED": rng.randint(50, 75), "VIRTUAL_TOUR": rng.randint(55, 75)
+                              }.get(key, rng.randint(5, 30))
                              if answered else None),
             "dncVerbatim": CALL_SCRIPTS["DNC"][1][1] if key == "DNC" else None,
         }
         if answered:
-            bhk = "3 BHK" if oc == "CONNECTED" else rng.choice(["3 BHK", "4 BHK"])
+            bhk = "3 BHK" if key in ("CONNECTED", "POST_VISIT") else rng.choice(["3 BHK", "4 BHK"])
             budget = rng.choice(BUDGETS)
             prompt = int(rng.gauss(32750, 1500))
             doc.update(
-                extractedSlots={"intent": CALL_INTENT[oc][0], "budget_bucket": budget if oc in WA_DOCS else None,
-                                "configuration_interest": bhk if oc in WA_DOCS else None,
-                                "timeline_bucket": {"PRE_SITE": "immediate", "CONNECTED": "3-6 months",
-                                                    "VIRTUAL_TOUR": "6-12 months"}.get(oc),
+                extractedSlots={"intent": CALL_INTENT[key][0], "budget_bucket": budget if key in WA_DOCS else None,
+                                "configuration_interest": bhk if key in WA_DOCS else None,
+                                "timeline_bucket": {"PRE_SITE": "immediate", "POST_VISIT": "immediate",
+                                                    "CONNECTED": "3-6 months", "VIRTUAL_TOUR": "6-12 months"}.get(key),
                                 "preferred_callback_time": "after 6 PM" if oc == "AUTO_CALLBACK" else None,
                                 "objection_raised": ("do_not_call" if key == "DNC" else "already_purchased")
                                 if oc == "NOT_INTERESTED" else None,
                                 "site_visit_requested": {"date": _next_saturday_11am(t).astimezone(IST).strftime(
                                     "%Y-%m-%d"), "slot": "11:00"} if oc == "PRE_SITE" else None},
-                userSignals={"is_qualified": oc in WA_DOCS, "is_likely_broker": False,
+                userSignals={"is_qualified": key in WA_DOCS, "is_likely_broker": False,
                              "language_detected": tx["language"].lower()},
-                buyingSignals=[{"signal": CALL_INTENT[oc][5], "strength": CALL_INTENT[oc][1]}] if oc in WA_DOCS else [],
-                leadTemperature={"PRE_SITE": "hot", "CONNECTED": "warm", "VIRTUAL_TOUR": "warm"}.get(oc, "cold"),
+                buyingSignals=[{"signal": CALL_INTENT[key][5], "strength": CALL_INTENT[key][1]}] if key in WA_DOCS else [],
+                leadTemperature={"PRE_SITE": "hot", "POST_VISIT": "hot", "CONNECTED": "warm",
+                                 "VIRTUAL_TOUR": "warm"}.get(key, "cold"),
                 objectionsHandled=["already_purchased"] if oc == "NOT_INTERESTED" else [],
                 tokenUsage={"prompt": prompt, "response": rng.randint(150, 400)},
-                whatsappSent=oc in WA_DOCS, whatsappDocs=WA_DOCS.get(oc, []),
-                whatsappSentAt=t + timedelta(seconds=dur + 30) if oc in WA_DOCS else None,
-                whatsappProject=tx["project"] if oc in WA_DOCS else None)
+                whatsappSent=bool(sent_docs.get(sid)), whatsappDocs=sent_docs.get(sid, []),
+                whatsappSentAt=t + timedelta(seconds=dur + 30) if sent_docs.get(sid) else None,
+                whatsappProject=tx["project"] if sent_docs.get(sid) else None)
             doc["tokenUsage"]["total"] = doc["tokenUsage"]["prompt"] + doc["tokenUsage"]["response"]
             # the clean post-call transcription (Gemini in Zoho) that the CIF call-scoring reads:
             # the same script, stamped with where each line is heard in the recording
@@ -592,18 +687,11 @@ def _angad_sources(rng, now, zleads, transcripts, schedules, recordings, wa, lof
                 "intent": {"caller_intent": ci[0], "intent_strength": ci[1], "customer_sentiment": ci[2],
                            "conversation_stage": ci[3], "urgency": ci[4], "site_visit_outcome": ci[5],
                            "next_step": ci[6], "customer_engagement": ci[7], "talk_balance": ci[8],
-                           "requirement_bhk": bhk if oc in WA_DOCS else None,
-                           "budget_inr": budget if oc in WA_DOCS else None,
+                           "requirement_bhk": bhk if key in WA_DOCS else None,
+                           "budget_inr": budget if key in WA_DOCS else None,
                            "objections": ("do_not_call" if key == "DNC" else "already_purchased")
                            if oc == "NOT_INTERESTED" else None,
                            "language": tx["language"].lower(), "call_summary": CALL_SUMMARY[key]}})
-            for d in WA_DOCS.get(oc, []):
-                blocked = rng.random() < 0.1
-                out[("Zoho_Database", "doc_send_log")].append({
-                    "phone": tx["phone_number"], "project": tx["project"], "doc_type": d, "call_sid": sid,
-                    "created_at": t + timedelta(seconds=dur + 30), "outcome": "blocked" if blocked else "sent",
-                    "block_reason": "outside the 24-hour WhatsApp window" if blocked else None,
-                    "matched_file": None if blocked else f"{tx['project'].title()}_{d}.pdf"})
         if oc == "VIRTUAL_TOUR" and lead:
             tour = (t + timedelta(days=1)).astimezone(IST).replace(hour=19, minute=0, second=0, microsecond=0)
             out[("Zoho_Database", "site_visit_bookings")].append({
@@ -617,9 +705,11 @@ def _angad_sources(rng, now, zleads, transcripts, schedules, recordings, wa, lof
                 "visit_at": tour.astimezone(timezone.utc), "scheduled_for": tour.astimezone(timezone.utc),
                 "type": "virtual", "status": "visit_scheduled"})
         if oc == "AUTO_CALLBACK":
+            due = _callback_time(t, rng)
+            called_back = any(x["started_at"] > t for x in calls_by_phone[p])
             out[("Zoho_Database", "callback_log")].append({
                 "phone": tx["phone_number"], "call_sid": sid, "requested_at": t, "preferred_time": "after 6 PM",
-                "status": "done" if t + timedelta(hours=8) < now else "scheduled"})
+                "status": "done" if called_back else ("scheduled" if due > now else "missed")})
         if oc == "PRE_SITE" and lead:
             visit = _next_saturday_11am(t)
             done = lead["stage"] == "Post Site Visit"
@@ -644,9 +734,6 @@ def _angad_sources(rng, now, zleads, transcripts, schedules, recordings, wa, lof
         if lead:
             out[("Intelligent_CRM", "lead_events")].append({
                 "person_id": f"P-{lead['mlid']}", "type": "ai_call", "outcome": oc, "at": t, "call_sid": sid})
-    calls_by_phone = {}
-    for tx in transcripts:
-        calls_by_phone.setdefault(tx["phone_number"][-10:], []).append(tx)
     ZOHO_EXPORT.clear()
     for z in zleads:
         p = z["phone"][-10:]
@@ -745,8 +832,9 @@ def _agent_runs(rng, now, chat_qa, voice_qa, zleads):
         top = Counter((i["type"], comp) for i, comp, _ in issues).most_common(3)
         problems = []
         for n, ((itype, comp), count) in enumerate(top):
-            sev, detail = (CHAT_ISSUES if comp == "chatbot" else VOICE_ISSUES)[itype]
-            evidence = [r.get("conversation_id") or r.get("call_sid") for i, c, r in issues if i["type"] == itype and c == comp]
+            hits = [(i, r) for i, c, r in issues if i["type"] == itype and c == comp]
+            sev, detail = hits[0][0]["severity"], hits[0][0]["detail"]
+            evidence = [r.get("conversation_id") or r.get("call_sid") for _, r in hits]
             problems.append({"id": f"P{n + 1}", "issue_type": itype, "urgency": sev, "components": [comp],
                              "title": f"{itype.replace('_', ' ').title().replace('Kb ', 'KB ')} ({comp}, {count}x)",
                              "what_is_wrong": detail, "what_is_not_wrong": "Other answers in the same conversations were accurate.",
@@ -779,37 +867,106 @@ def _agent_runs(rng, now, chat_qa, voice_qa, zleads):
     return out
 
 
+def audit(c):
+    """Every cross-system consistency rule the demo promises. Returns a list of violations."""
+    z, l, vb, qa, ag = c["Zoho_Database"], c["asbl_loft"], c["ASBLVoiceBot"], c["qa_results"], c["angad"]
+    bad = []
+    def check(ok, msg):
+        if not ok:
+            bad.append(msg)
+    as_utc = lambda d: d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+    now = datetime.now(timezone.utc)
+    calls = {}
+    for tx in vb["call_transcripts"].find():
+        calls.setdefault(tx["phone_number"][-10:], []).append(tx)
+    for cs in calls.values():
+        cs.sort(key=lambda x: x["started_at"])
+    made_of = lambda cs: [{"outcome": x["call_outcome"], "key": x["script"] or x["call_outcome"],
+                           "t": as_utc(x["started_at"])} for x in cs]
+    sites = {d["call_sid"]: d for d in z["site_visit_bookings"].find()}
+    export = {r["Project Lead ID"]: r for r in ZOHO_EXPORT}
+
+    for lead in z["leads"].find():
+        p, cs = lead["phone"][-10:], calls.get(lead["phone"][-10:], [])
+        stage, reason = _stage_from_calls(made_of(cs), lead["not_interested_reason"] == "Not Responding")
+        check((lead["stage"], lead["not_interested_reason"]) == (stage, reason),
+              f"{lead['_id']}: stage {lead['stage']}/{lead['not_interested_reason']} but calls say {stage}/{reason}")
+        check(lead["stage"] == lead["prd_stage"], f"{lead['_id']}: Zoho stage != relay stage")
+        ni = next((as_utc(x["started_at"]) for x in cs if x["call_outcome"] == "NOT_INTERESTED"), None)
+        check(ni is None or all(as_utc(x["started_at"]) <= ni for x in cs), f"{lead['_id']}: called after 'not interested'")
+        for x in cs:
+            if x["call_outcome"] == "PRE_SITE":
+                b = sites.get(x["call_sid"])
+                check(b is not None and b["type"] == "site", f"{x['call_sid']}: booking call without a site booking")
+                if b:
+                    visit = as_utc(b["scheduled_for"])
+                    post = [y for y in cs if y["script"] == "POST_VISIT"]
+                    check(all(as_utc(y["started_at"]) > visit for y in post), f"{lead['_id']}: post-visit call before the visit")
+                    check((b["status"] == "completed") == (lead["stage"] == "Post Site Visit"),
+                          f"{lead['_id']}: visit status {b['status']} vs stage {lead['stage']}")
+            if x["call_outcome"] == "VIRTUAL_TOUR":
+                check(sites.get(x["call_sid"], {}).get("type") == "virtual", f"{x['call_sid']}: virtual tour not booked")
+        e = export.get(lead["_id"], {})
+        check(e.get("Stage") == lead["stage"] and (e.get("Not Interested Reason") or None) == lead["not_interested_reason"],
+              f"{lead['_id']}: Zoho export disagrees with the CRM record")
+    for cs in calls.values():
+        for a, b in zip(cs, cs[1:]):
+            if a["call_outcome"] == "AUTO_CALLBACK":
+                check(as_utc(b["started_at"]).astimezone(IST).hour >= 18, f"{b['call_sid']}: call back before 6 PM")
+        for x in cs:
+            h = as_utc(x["started_at"]).astimezone(IST).hour
+            check(9 <= h < 21, f"{x['call_sid']}: call outside 9am-9pm IST")
+            check(not x["transcript"] or x["language"] == "English", f"{x['call_sid']}: transcript language")
+
+    # WhatsApp follows the calls: documents promised on a call go out right after it, nothing after "not interested"
+    sec = lambda d: d.replace(microsecond=0).isoformat()  # the database keeps milliseconds only
+    sent = {(d["phone"][-10:], sec(as_utc(d["created_at"]))) for d in z["doc_send_log"].find({"outcome": "sent"})}
+    for w in z["whatsapp_messages"].find():
+        p, cs = w["_id"][-10:], calls.get(w["_id"][-10:], [])
+        ni = next((as_utc(x["started_at"]) for x in cs if x["call_outcome"] == "NOT_INTERESTED"), None)
+        for day in w["by_date"].values():
+            for direction in ("inbound", "outbound"):
+                for m in day[direction]:
+                    t = datetime.fromisoformat(m["time"])
+                    check(ni is None or t < ni, f"{p}: WhatsApp after 'not interested'")
+                    if direction == "outbound" and "thanks for your interest" not in m["msg"]:  # all but the intro
+                        check((p, sec(t)) in sent, f"{p}: document message without a document send")
+    # QA findings are visible in what they judged
+    convs = {d["conversationId"]: d for d in l["conversations"].find()}
+    for r in qa["chatbot_qa"].find({"status": "FAIL"}):
+        users = {t.get("userText") for t in convs[r["conversation_id"]]["conversationDepth"]}
+        for i in r["issues"]:
+            check(CHAT_FAULTS[i["type"]][1] in users, f"{r['conversation_id']}: {i['type']} not in the conversation")
+    script = {x["call_sid"]: x["script"] for cs in calls.values() for x in cs}
+    for r in qa["voice_qa"].find():
+        allowed = {VOICE_ISSUES.get(script[r["call_sid"]], ())[:1], VOICE_LOW.get(script[r["call_sid"]], ())[:1]}
+        for i in r["issues"]:
+            check((i["type"],) in allowed, f"{r['call_sid']}: {i['type']} doesn't fit the {script[r['call_sid']]} call")
+    # the three dashboards read the same calls
+    check({d["roomName"] for d in ag["calls"].find()} == set(script), "ANGAD and CRM call logs differ")
+    check(vb["call_transcript_intent_identification"].count_documents({}) == vb["call_recordings"].count_documents({}),
+          "intent analysis missing for some answered calls")
+    for u in {r["recording_url"] for r in vb["call_recordings"].find()}:
+        check(os.path.exists(os.path.join(RECORDING_DIR, u.rsplit("/", 1)[1])), f"missing recording {u}")
+    check(set(RECORDING_TIMINGS) == set(CALL_SCRIPTS), "recordings out of date: run make_recordings.py")
+    check(all(0 <= d["score"] <= 10 for d in qa["health_scores"].find()), "health score outside 0-10")
+    return bad
+
+
 if __name__ == "__main__":
     c = install()
     z, l, vb, qa = c["Zoho_Database"], c["asbl_loft"], c["ASBLVoiceBot"], c["qa_results"]
     assert z["leads"].count_documents({}) == N_LEADS, "one CRM record per lead"
     assert l["leads"].count_documents({}) == N_WEBSITE
-    conv_ids = {d["conversationId"] for d in l["conversations"].find({}, {"conversationId": 1})}
-    sids = {d["call_sid"] for d in vb["call_transcripts"].find({}, {"call_sid": 1})}
-    assert all(d["conversation_id"] in conv_ids for d in qa["chatbot_qa"].find()), "chatbot QA -> real conversation"
-    assert all(d["call_sid"] in sids for d in qa["voice_qa"].find()), "voice QA -> real call"
-    assert qa["voice_qa"].count_documents({}) == N_VOICE_QA
+    assert qa["voice_qa"].count_documents({}) == N_VOICE_QA and len(BULK_SHEET) == N_BULK == len(BULK_STAGES)
     for name in ("analytics_runs", "feedback", "recommendations", "health_scores", "token_usage"):
         assert qa[name].count_documents({}) > 0, name
-    assert all(0 <= d["score"] <= 10 for d in qa["health_scores"].find()), "health is out of 10"
-    hours = {datetime.fromisoformat(s["called_at"]).astimezone(IST).hour for s in vb["call_schedules"].find()}
-    assert hours and min(hours) >= 9 and max(hours) < 21, f"calls outside 9am-9pm IST: {sorted(hours)}"
-    outs = {}
-    for d in vb["call_transcripts"].find():
-        outs.setdefault(d["phone_number"][-10:], set()).add(d["call_outcome"])
-    assert all("PRE_SITE" in outs.get(lead["phone"][-10:], ()) for lead in z["leads"].find(
-        {"prd_stage": {"$in": ["Pre Site Visit", "Post Site Visit"]}})), "booked visit without a booking call"
-    assert ({d["roomName"] for d in c["angad"]["calls"].find()}
-            == {d["call_sid"] for d in vb["call_transcripts"].find()}), "ANGAD and CRM must share the same calls"
-    assert ({d["phone"][-10:] for d in z["site_visit_bookings"].find({"type": "site"})} == {d["phone"][-10:] for d in z["leads"].find(
-        {"prd_stage": {"$in": ["Pre Site Visit", "Post Site Visit"]}})}), "bookings must match booked stages"
-    urls = {r["recording_url"] for r in vb["call_recordings"].find()}
-    assert all(os.path.exists(os.path.join(RECORDING_DIR, u.rsplit("/", 1)[1])) for u in urls), "missing recording file"
-    assert set(RECORDING_TIMINGS) == set(CALL_SCRIPTS), "run make_recordings.py"
-    assert len(BULK_SHEET) == N_BULK and vb["call_schedules"].count_documents({"call_id": {"$regex": "^BK-"}}) > 0
+    problems = audit(c)
+    for msg in problems[:15]:
+        print("  INCONSISTENT:", msg)
     print({f"{db}.{name}": c[db][name].count_documents({}) for db, name in [
-        ("Zoho_Database", "leads"), ("Zoho_Database", "whatsapp_messages"), ("asbl_loft", "leads"),
-        ("asbl_loft", "conversations"), ("ASBLVoiceBot", "call_transcripts"), ("ASBLVoiceBot", "call_recordings"),
-        ("qa_results", "chatbot_qa"), ("qa_results", "voice_qa"), ("qa_results", "analytics_runs"),
-        ("qa_results", "feedback"), ("qa_results", "recommendations"), ("qa_results", "health_scores")]})
-    print("demo_data self-check passed")
+        ("Zoho_Database", "leads"), ("Zoho_Database", "whatsapp_messages"), ("asbl_loft", "conversations"),
+        ("ASBLVoiceBot", "call_transcripts"), ("ASBLVoiceBot", "call_recordings"), ("qa_results", "chatbot_qa"),
+        ("qa_results", "voice_qa"), ("Zoho_Database", "site_visit_bookings"), ("angad", "calls")]})
+    assert not problems, f"{len(problems)} consistency problems"
+    print("demo_data self-check passed: 0 consistency problems")

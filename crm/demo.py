@@ -50,6 +50,13 @@ with tc.session_transaction() as s:
 up = tc.post("/api/bulk-calls/upload", data={"file": (sheet, "campaign.xlsx")},
              headers={"X-CSRF-Token": "demo"}, content_type="multipart/form-data").get_json()
 print(f"[demo] bulk campaign uploaded: {up}")
+# ...then set each bulk lead's stage from what happened on its calls, through the real stage route.
+for lead_id, stage, reason in demo_data.BULK_STAGES:
+    if stage != "New Lead":
+        tc.post("/api/bulk-calls/stage", json={"id": lead_id, "stage": stage, "reason": reason},
+                headers={"X-CSRF-Token": "demo"})
+_problems = demo_data.audit(client)
+print(f"[demo] consistency audit: {len(_problems)} problems" + (f" (first: {_problems[0]})" if _problems else ""))
 
 # Main Dashboard tab (ANGAD): build its cache from the SAME dummy data with its real
 # sync.py, then serve it on 127.0.0.1:8777, where the CRM's /main-dashboard proxy looks.
