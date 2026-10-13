@@ -7466,8 +7466,8 @@ async function loadPage(p) {
       const issues = doc.issues || [];
       const issueCount = issues.length;
       const issueSummary = issueCount ? `<span class="badge badge-red">${issueCount} issue${issueCount>1?'s':''}</span>` : '<span class="badge badge-green">Clean</span>';
-      const langComp = doc.language_compliance;
-      const langBadge = langComp === true ? '<span class="badge badge-green">Yes</span>' : langComp === false ? '<span class="badge badge-red">No</span>' : '<span class="badge badge-gray">—</span>';
+      const langComp = doc.language_compliance;  // the voice QA agent writes "PASS"/"FAIL"
+      const langBadge = (langComp === true || langComp === 'PASS') ? '<span class="badge badge-green">Yes</span>' : (langComp === false || langComp === 'FAIL') ? '<span class="badge badge-red">No</span>' : '<span class="badge badge-gray">—</span>';
 
       const expandContent = [
         doc.started_at  ? `<div class="expand-section"><div class="expand-label">Call Started</div><div class="expand-value">${fmtDate(doc.started_at)}</div></div>` : '',
@@ -7486,7 +7486,7 @@ async function loadPage(p) {
           <td>${statusBadge(doc.status)}</td>
           <td style="font-family:'DM Mono',monospace;font-size:13px;">${doc.score != null ? (doc.score.toFixed ? doc.score.toFixed(1) : doc.score) : '—'}</td>
           <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text-dim);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml((doc.call_sid||'—').slice(0,18))}</td>
-          <td><span class="badge badge-gray">${escHtml(doc.language||'—')}</span></td>
+          <td><span class="badge badge-gray">${escHtml(doc.language||doc.language_used||'—')}</span></td>
           <td>${langBadge}</td>
           <td>${issueSummary}</td>
           <td style="font-size:12px;color:var(--text-muted);">${fmtDate(doc.conversation_date || doc.evaluated_at)}</td>
@@ -7709,7 +7709,7 @@ async function loadPage(p) {
         <td style="font-family:'DM Mono',monospace;font-size:11px;">${escHtml(flag.turn ?? '—')}</td>
         <td><span class="badge badge-amber" style="font-family:'DM Mono',monospace;">${escHtml(flag.type||'—')}</span></td>
         <td><span class="badge badge-gray">${escHtml(flag.layer||'—')}</span></td>
-        <td style="font-size:12px;color:var(--text-muted);max-width:350px;">${escHtml((flag.message||flag.detail||'').slice(0,120))}</td>
+        <td style="font-size:12px;color:var(--text-muted);max-width:350px;">${escHtml((flag.message||flag.text||flag.detail||'').slice(0,120))}</td>
       </tr>`).join('');
     }).join('');
   } catch(e) {

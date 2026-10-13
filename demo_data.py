@@ -40,6 +40,8 @@ LAST = ["Reddy", "Rao", "Sharma", "Varma", "Naidu", "Gupta", "Iyer", "Kumar", "P
 SOURCES = [("Inncircles", "inncircles", "CRM_Push"), ("Meta Ads", "facebook", "Meta_Leadgen"),
            ("Google Ads", "google", "Search_Brand"), ("99acres", "99acres", "Portal"),
            ("Housing.com", "housing", "Portal")]
+WEB_CAMPAIGN = {"google": "LOFT_Search_Brand", "facebook": "LOFT_Meta_Leadgen",
+                "instagram": "LOFT_Insta_Reels", "direct": ""}  # website utm source -> campaign
 STAGES = {"New Lead": 25, "Lead Initiated": 38, "Pre Site Visit": 12,
           "Post Site Visit": 6, "Not Interested": 19}
 NI_REASONS = ["Not Responding", "Declined", "Budget", "Inventory", "Already Purchased",
@@ -81,7 +83,14 @@ VOICE_ISSUES = {
 }
 LOW_ISSUE = {"chatbot": ("MINOR_PHRASING", "Repeated the same sentence twice in one reply."),
              "voice": ("YEAR_FORMAT", "Read 2027 as 'two zero two seven'.")}
-SPAM_TYPES = ["JOB_QUERY", "PROMO_SCAM", "LINK_URL", "AUTO_REPLY", "PERSONAL_IRRELEVANT"]
+SPAM_TEXT = {  # spam filter category -> a junk website message
+    "JOB_QUERY": "Are you hiring? I want a job in sales.",
+    "PROMO_SCAM": "Earn 50,000 per day from home!! Reply YES to join.",
+    "LINK_URL": "check this offer example.com/free-gift",
+    "AUTO_REPLY": "Thank you for your message. I am out of office until Monday.",
+    "PERSONAL_IRRELEVANT": "hi what is your name, are you a real person?",
+    "KEYSMASH": "asdfgh jkl;;",
+}
 FIX = {  # issue type -> (change type, where, fix)
     "KB_MISMATCH": ("KB_UPDATE", "knowledge_base/webbot/02_kb_project_loft.md",
                     "Put the current price and possession date in one clearly labelled table."),
@@ -97,9 +106,31 @@ FIX = {  # issue type -> (change type, where, fix)
                        "Add examples: 1.9 crore -> 'one point nine crore'."),
     "LANGUAGE_HANDLING": ("PROMPT_UPDATE", "knowledge_base/anandita/system_prompt.md",
                           "Switch language when the customer does, within one turn."),
+    # voice-agent versions of shared issue types point at the voice agent's own files
+    ("KB_MISMATCH", "voice"): ("KB_UPDATE", "knowledge_base/anandita/project_facts.md",
+                               "Correct the possession date in the voice agent's project facts."),
+    ("INVENTED_FACT", "voice"): ("PROMPT_UPDATE", "knowledge_base/anandita/system_prompt.md",
+                                 "Add a rule: if a fact is not in project_facts.md, say you'll confirm and call back."),
+    ("INCOMPLETE_RESPONSE", "voice"): ("PROMPT_UPDATE", "knowledge_base/anandita/qa_checklist.md",
+                                       "Check every customer question is answered before closing the call."),
 }
 
+N_BULK = 60  # cold-call numbers for the Bulk Calls tab (on top of the 1,000 leads)
+BULK_OUTCOMES = ["CONNECTED", "NOT_INTERESTED", "AUTO_CALLBACK", "PRE_SITE"]
+BULK_SHEET = []  # filled by seed(): the campaign sheet rows demo.py uploads
+IST = timezone(timedelta(hours=5, minutes=30))
+
 _client = None
+
+
+def _calling_hours(t, rng):
+    """Move a call into 9am-9pm IST, the window the real dialler calls in."""
+    local = t.astimezone(IST)
+    if 9 <= local.hour < 21:
+        return t
+    day = local.date() + timedelta(days=1 if local.hour >= 21 else 0)
+    return (datetime(day.year, day.month, day.day, 9, tzinfo=IST) + timedelta(minutes=rng.uniform(0, 600))
+            ).astimezone(timezone.utc)
 
 
 def install():
@@ -181,6 +212,26 @@ def seed(client, n_leads=N_LEADS):
     zleads, wa, transcripts, recordings, schedules = [], [], [], [], []
     loft_leads, vlogs, convs, events, chat_qa, answered = [], [], [], [], [], []
 
+    def add_call(sid, phone, project, outcome, t, first, esid):
+        """One call: transcript, schedule (trigger record) and, if answered, a recording."""
+        inbound = outcome == "CONNECTED" and rng.random() < 0.05
+        direction = "inbound" if inbound else "outbound"
+        turns = [] if outcome in MISSED else _transcript(rng, outcome, first, project, "91" + phone, t)
+        lang = rng.choice(["English", "English", "Hinglish", "Telugu", "Hindi"])
+        transcripts.append({"call_sid": sid, "phone_number": "+91" + phone, "project": project,
+                            "call_direction": direction, "call_outcome": outcome, "started_at": t,
+                            "transcript": turns, "language": lang})
+        schedules.append({"to": "+91" + phone, "call_id": sid, "call_outcome": outcome,
+                          "status": SCHEDULE_STATUS.get(outcome, "completed"), "metadata": {"project": project},
+                          "external_schedule_id": esid, "created_at": t, "scheduled_at": t, "called_at": iso(t)})
+        if not turns:
+            return None
+        dur = (turns[-1]["ts"] - turns[0]["ts"]).total_seconds() + rng.randint(5, 40)
+        recordings.append({"call_sid": sid, "phone_number": "+91" + phone, "call_status": "completed",
+                           "call_direction": direction, "recording_url": f"https://example.com/recordings/{sid}.mp3",
+                           "recording_duration_secs": round(dur), "created_at": t})
+        return t, sid, "+91" + phone, project, lang, inbound
+
     for i in range(n_leads):
         first, last = rng.choice(FIRST), rng.choice(LAST)
         phone = f"74{i:08d}"  # obviously fake, unique 10-digit numbers
@@ -191,24 +242,28 @@ def seed(client, n_leads=N_LEADS):
         created = now - timedelta(days=rng.uniform(0.3, 45))
         lead_source, utm, camp = rng.choice(SOURCES)
         plid = f"{1000 + i}-{project}"
+        web_src = rng.choice(list(WEB_CAMPAIGN)) if website else None
+        campaign = WEB_CAMPAIGN[web_src] if website else f"{project}_{camp}"
 
         # CRM record (Zoho). Website leads also get one, so they carry a stage.
         zleads.append({
             "_id": plid, "phone": "91" + phone, "first_name": first, "last_name": last,
             "project": project, "prd_stage": stage, "not_interested_reason": reason,
             "lead_source": "Website" if website else lead_source,
-            "utm_source": "website" if website else utm, "utm_campaign": f"{project}_{camp}",
-            "campaign_name": f"{project}_{camp}", "created_at": created, "lead_received_at": created,
+            "utm_source": "website" if website else utm, "utm_campaign": campaign,
+            "campaign_name": campaign, "created_at": created, "lead_received_at": created,
             "source_lead_id": f"SRC-{500000 + i}", "mlid": str(700000 + i), "bot_enabled": True,
             "chatbot_status": rng.choice(["NA", "CF", "SF"]), "call_status": "SS",
         })
 
         if website:  # website lead + chatbot conversations + browsing sessions
-            oid, vid = ObjectId(), f"v-{i:05d}"
+            # Real Mongo ids start with their creation time; plain ObjectId() would give
+            # all 150 leads the same prefix (they're made in the same second).
+            oid = ObjectId(f"{int(created.timestamp()):08x}{rng.getrandbits(64):016x}")
+            vid = f"v-{i:05d}"
             loft_leads.append({"_id": oid, "name": f"{first} {last}", "phone": "+91" + phone,
                                "createdAt": created, "visitorId": vid,
-                               "source": {"utmSource": rng.choice(["google", "facebook", "instagram", "direct"]),
-                                          "utmCampaign": f"LOFT_{camp}"}})
+                               "source": {"utmSource": web_src, "utmCampaign": WEB_CAMPAIGN[web_src]}})
             vlogs.append({"visitorId": vid, "leadId": oid})
             for s in range(rng.randint(1, 5)):
                 st = created + timedelta(hours=rng.uniform(0, 72))
@@ -220,7 +275,12 @@ def seed(client, n_leads=N_LEADS):
                     break
                 cid = f"c-{int(t.timestamp() * 1000)}-{i:04d}{c}"
                 depth, start = [], t
-                for q, a, art, label in rng.sample(QUESTIONS, k=rng.randint(2, 5)):
+                spam = rng.choice(sorted(SPAM_TEXT)) if rng.random() < 0.06 else None
+                if spam:  # one junk message; the spam filter skips these before QA
+                    t += timedelta(seconds=rng.randint(10, 90))
+                    depth.append({"userText": SPAM_TEXT[spam], "userAt": t, "botAt": t + timedelta(seconds=3),
+                                  "botText": "I can help with questions about our homes. What would you like to know?"})
+                for q, a, art, label in ([] if spam else rng.sample(QUESTIONS, k=rng.randint(2, 5))):
                     t += timedelta(seconds=rng.randint(10, 90))
                     depth.append({"userText": q, "botText": a.format(p=PRICE_CR[project]),
                                   "userAt": t, "botAt": t + timedelta(seconds=3)})
@@ -236,38 +296,26 @@ def seed(client, n_leads=N_LEADS):
                         "lead_id": str(oid), "conversation_date": iso(start), "evaluated_at": iso(evaluated),
                         "confidence": round(rng.uniform(0.7, 0.98), 2),
                         "token_usage": {"input": rng.randint(9000, 12000), "output": rng.randint(150, 600)}}
-                if rng.random() < 0.06:  # spam filter skips these before QA
+                if spam:  # same flag shape as spam_filter.flag_conversation
                     chat_qa.append({**base, "status": "SKIPPED", "skip_reason": "SPAM_FILTERED", "is_spam": True,
-                                    "spam_flags": [{"type": rng.choice(SPAM_TYPES)}], "issues": [],
+                                    "spam_flags": [{"turn": 1, "type": spam, "layer": 1, "text": SPAM_TEXT[spam]}],
+                                    "issues": [],
                                     "summary": "Skipped by spam filter.", "score": None})
                     continue
                 status, score, issues, summary = _verdict(rng, CHAT_ISSUES, "chatbot")
                 chat_qa.append({**base, "status": status, "score": score, "issues": issues,
                                 "summary": summary, "is_spam": False, "spam_flags": [], "user_flags": []})
 
-        # AI calls: a transcript per call, a recording when answered, a schedule per trigger
+        # AI calls, only inside calling hours
         t = created
         for n, outcome in enumerate(_call_plan(rng, stage, reason)):
-            t += timedelta(hours=rng.uniform(2, 30))
+            t = _calling_hours(t + timedelta(hours=rng.uniform(2, 30)), rng)
             if t > now:
                 break
-            sid = f"CA-{i:04d}-{n}"
-            inbound = outcome == "CONNECTED" and rng.random() < 0.05
-            turns = [] if outcome in MISSED else _transcript(rng, outcome, first, project, "91" + phone, t)
-            lang = rng.choice(["English", "English", "Hinglish", "Telugu", "Hindi"])
-            transcripts.append({"call_sid": sid, "phone_number": "+91" + phone, "project": project,
-                                "call_direction": "inbound" if inbound else "outbound",
-                                "call_outcome": outcome, "started_at": t, "transcript": turns, "language": lang})
-            schedules.append({"to": "+91" + phone, "call_id": sid, "status": SCHEDULE_STATUS.get(outcome, "completed"),
-                              "external_schedule_id": f"prd-{plid}-{int(t.timestamp() * 1000)}",
-                              "created_at": t, "scheduled_at": t, "called_at": iso(t)})
-            if turns:
-                dur = (turns[-1]["ts"] - turns[0]["ts"]).total_seconds() + rng.randint(5, 40)
-                recordings.append({"call_sid": sid, "phone_number": "+91" + phone, "call_status": "completed",
-                                   "call_direction": "inbound" if inbound else "outbound",
-                                   "recording_url": f"https://example.com/recordings/{sid}.mp3",
-                                   "recording_duration_secs": round(dur), "created_at": t})
-                answered.append((t, sid, "+91" + phone, project, lang, inbound))
+            hit = add_call(f"CA-{i:04d}-{n}", phone, project, outcome, t, first,
+                           f"prd-{plid}-{int(t.timestamp() * 1000)}")
+            if hit:
+                answered.append(hit)
 
         # WhatsApp thread for ~65% of leads; ~35% of those reply
         if rng.random() < 0.65:
@@ -287,6 +335,21 @@ def seed(client, n_leads=N_LEADS):
             if by_date:
                 wa.append({"_id": "91" + phone, "phone": "91" + phone, "last_message_at": iso(last_at),
                            "by_date": by_date})
+
+    # Bulk cold-call campaign: numbers that exist only in the call logs. demo.py uploads
+    # BULK_SHEET through the CRM's real upload route, which builds these leads.
+    BULK_SHEET.clear()
+    for j in range(N_BULK):
+        first, last = rng.choice(FIRST), rng.choice(LAST)
+        phone, project = f"75{j:08d}", rng.choice(PROJECTS)
+        BULK_SHEET.append({"Phone": phone, "Project": project, "Name": f"{first} {last}", "Lead ID": f"BLK-{3000 + j}"})
+        t = now - timedelta(days=rng.uniform(1, 20))
+        for n in range(rng.randint(1, 4)):
+            t = _calling_hours(t + timedelta(hours=rng.uniform(3, 48)), rng)
+            if t > now:
+                break
+            add_call(f"BK-{j:04d}-{n}", phone, project, rng.choice(MISSED + BULK_OUTCOMES), t, first,
+                     f"dash_bulk-{j}-{n}")
 
     # Voice QA: the most recent answered calls
     voice_qa = []
@@ -314,6 +377,19 @@ def seed(client, n_leads=N_LEADS):
         if docs:
             col.insert_many(docs)
     return client
+
+
+SEVERITY_PENALTY = {"HIGH": 2.0, "MEDIUM": 0.8, "LOW": 0.2}  # same as qa-agent/agents/feedback.py
+
+
+def _health(results):
+    """Health 0-10, same formula as feedback.compute_health_score: score minus severity x confidence."""
+    if not results:
+        return 0.0
+    adjusted = [max(0.0, min(10.0, (r["score"] or 0) - sum(
+        SEVERITY_PENALTY.get(i["severity"], 0.2) * r.get("confidence", 0.5) for i in r["issues"])))
+        for r in results]
+    return round(sum(adjusted) / len(results), 2)
 
 
 def _agent_runs(rng, now, chat_qa, voice_qa, zleads):
@@ -344,7 +420,7 @@ def _agent_runs(rng, now, chat_qa, voice_qa, zleads):
         for band, b in bands.items():
             if b["conversion_rate"] < VISIT_TARGET:
                 flags.append({"type": "BAND_CONVERSION_BELOW_TARGET", "severity": "MEDIUM", "source": "orchestrator",
-                              "detail": f"{band} band converts {b['conversion_rate']:.0%} of leads to site visits (target {VISIT_TARGET:.0%})."})
+                              "detail": f"{band} band converts {b['conversion_rate']:.1%} of leads to site visits (target {VISIT_TARGET:.0%})."})
         accuracy = round(rng.uniform(0.84, 0.98), 2)
         if accuracy < 0.9:
             flags.append({"type": "META_SIGNAL_MISMATCH", "severity": "HIGH", "source": "orchestrator",
@@ -359,12 +435,15 @@ def _agent_runs(rng, now, chat_qa, voice_qa, zleads):
             "agent_messages": [],
         })
 
-        high_flags = sum(f["severity"] == "HIGH" for f in flags)
-        for comp, score, rate, n in (("chatbot", round((1 - cb_fail) * 100, 1), cb_fail, len(cb)),
-                                     ("voice", round((1 - vc_fail) * 100, 1), vc_fail, len(vc)),
-                                     ("analytics", max(0.0, 100 - 15.0 * high_flags), 0.0, len(flags))):
+        cb_health, vc_health = _health(cb), _health(vc)
+        high_f = sum(f["severity"] == "HIGH" for f in flags)
+        med_f = sum(f["severity"] == "MEDIUM" for f in flags)
+        for comp, score, rate, n in (("chatbot", cb_health, cb_fail, len(cb)),
+                                     ("voice", vc_health, vc_fail, len(vc)),
+                                     ("analytics", max(0.0, 10.0 - high_f * 2.5 - med_f * 1.0),
+                                      round(high_f / max(len(flags), 1), 3), len(flags))):
             if n == 0:
-                continue  # nothing evaluated in this window -> no score (not a perfect 100)
+                continue  # nothing evaluated in this window -> no score
             out["health_scores"].append({"recorded_at": hi, "component": comp, "score": score,
                                          "fail_rate": round(rate, 3), "details": {"evaluated": n}})
 
@@ -382,7 +461,7 @@ def _agent_runs(rng, now, chat_qa, voice_qa, zleads):
                              "evidence": evidence[:3]})
         out["feedback"].append({
             "submitted_at": hi, "source": "automated", "window_hours": WINDOW_H,
-            "chatbot_health": round((1 - cb_fail) * 100, 2), "voice_health": round((1 - vc_fail) * 100, 2),
+            "chatbot_health": cb_health, "voice_health": vc_health,
             "chatbot_fail_rate": round(cb_fail, 3), "voice_fail_rate": round(vc_fail, 3),
             "chatbot_evaluated": len(cb), "voice_evaluated": len(vc), "problems_found": len(problems),
             "high_problems": sum(p["urgency"] == "HIGH" for p in problems),
@@ -393,7 +472,7 @@ def _agent_runs(rng, now, chat_qa, voice_qa, zleads):
         if problems:
             fixes = []
             for n, p in enumerate(problems):
-                change, where, fix = FIX[p["issue_type"]]
+                change, where, fix = FIX.get((p["issue_type"], p["components"][0])) or FIX[p["issue_type"]]
                 fixes.append({"rank": n + 1, "problem_id": p["id"], "component": p["components"][0],
                               "problem": p["title"], "fix": fix, "where": where, "change_type": change,
                               "kb_reference": where, "expected_outcome": "Fewer repeats of this issue in the next runs."})
@@ -420,6 +499,10 @@ if __name__ == "__main__":
     assert qa["voice_qa"].count_documents({}) == N_VOICE_QA
     for name in ("analytics_runs", "feedback", "recommendations", "health_scores", "token_usage"):
         assert qa[name].count_documents({}) > 0, name
+    assert all(0 <= d["score"] <= 10 for d in qa["health_scores"].find()), "health is out of 10"
+    hours = {datetime.fromisoformat(s["called_at"]).astimezone(IST).hour for s in vb["call_schedules"].find()}
+    assert hours and min(hours) >= 9 and max(hours) < 21, f"calls outside 9am-9pm IST: {sorted(hours)}"
+    assert len(BULK_SHEET) == N_BULK and vb["call_schedules"].count_documents({"call_id": {"$regex": "^BK-"}}) > 0
     print({f"{db}.{name}": c[db][name].count_documents({}) for db, name in [
         ("Zoho_Database", "leads"), ("Zoho_Database", "whatsapp_messages"), ("asbl_loft", "leads"),
         ("asbl_loft", "conversations"), ("ASBLVoiceBot", "call_transcripts"), ("ASBLVoiceBot", "call_recordings"),
