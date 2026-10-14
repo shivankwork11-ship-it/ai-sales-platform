@@ -193,7 +193,6 @@ CORPUS_TIER = {                       # name -> (tier, stated accuracy, why)
 # transcripts; Anandita appears in the Zoho corpus and is a THIRD name.
 PERSONA_RX = re.compile(r"\b(?:this is|myself|i am|i'?m)\s+([A-Z][a-z]{2,15})\b")
 KNOWN_PERSONAS = {"Radhika", "Ankit", "Anandita"}
-PERSONA_SWITCH = pd.Timestamp("2026-08-07")
 
 # Why each judge indicator is NA. Distinguishing these was approved item (4).
 NA_REASON = {
@@ -313,10 +312,8 @@ def main():
         # (3) persona era
         p = persona_of_text(text)
         s["persona"] = p or "unknown"
-        d = pd.to_datetime(x.get("call_date"), errors="coerce")
-        s["persona_era"] = ("pre-switch (Radhika)" if pd.notna(d) and d < PERSONA_SWITCH
-                            else "post-switch (Ankit/Anandita)" if pd.notna(d)
-                            else "undated")
+        # the agent named in the call itself, not an era inferred from a fixed date
+        s["persona_era"] = p or "agent not named"
         tier, acc, why = CORPUS_TIER.get(x.get("corpus"), ("?", "?", "?"))
         s.update({"lead_ref": x["lead_ref"], "call_date": x.get("call_date"),
                   "outcome": x.get("outcome"), "project": x.get("project"),

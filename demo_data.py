@@ -710,6 +710,14 @@ def _angad_sources(rng, now, zleads, transcripts, schedules, recordings, wa, lof
             out[("Zoho_Database", "callback_log")].append({
                 "phone": tx["phone_number"], "call_sid": sid, "requested_at": t, "preferred_time": "after 6 PM",
                 "status": "done" if called_back else ("scheduled" if due > now else "missed")})
+        if oc == "PRE_SITE":  # every booking gets its reminders (bulk-campaign bookings too)
+            visit_r = _next_saturday_11am(t)
+            for hours, label in ((12, "12h before visit"), (1, "1h before visit")):
+                due = visit_r - timedelta(hours=hours)
+                out[("angad", "scheduledcalls")].append({
+                    "phone": tx["phone_number"], "slug": "site_visit_reminder", "kind": "reminder",
+                    "status": "done" if due < now else "pending", "dueAt": due, "visitAt": visit_r,
+                    "attempts": int(due < now), "label": label, "sourceCallId": sid, "createdAt": t})
         if oc == "PRE_SITE" and lead:
             visit = _next_saturday_11am(t)
             done = lead["stage"] == "Post Site Visit"
@@ -723,12 +731,6 @@ def _angad_sources(rng, now, zleads, transcripts, schedules, recordings, wa, lof
                 "person_id": f"P-{lead['mlid']}", "project": lead["project"], "booked_at": t, "visit_at": visit,
                 "created_at": t, "scheduled_for": visit, "type": "site",
                 "status": "visit_done" if done else "visit_scheduled"})
-            for hours, label in ((12, "12h before visit"), (1, "1h before visit")):
-                due = visit - timedelta(hours=hours)
-                out[("angad", "scheduledcalls")].append({
-                    "phone": tx["phone_number"], "slug": "site-visit-reminder", "kind": "reminder",
-                    "status": "done" if due < now else "pending", "dueAt": due, "visitAt": visit, "attempts": int(due < now),
-                    "label": label, "sourceCallId": sid, "createdAt": t})
         doc["callbackUrl"] = None
         out[("angad", "calls")].append(doc)
         if lead:
@@ -942,6 +944,9 @@ def audit(c):
         allowed = {VOICE_ISSUES.get(script[r["call_sid"]], ())[:1], VOICE_LOW.get(script[r["call_sid"]], ())[:1]}
         for i in r["issues"]:
             check((i["type"],) in allowed, f"{r['call_sid']}: {i['type']} doesn't fit the {script[r['call_sid']]} call")
+    rem = Counter(d["sourceCallId"] for d in ag["scheduledcalls"].find({"slug": "site_visit_reminder"}))
+    for x in vb["call_transcripts"].find({"call_outcome": "PRE_SITE"}):
+        check(rem.get(x["call_sid"]) == 2, f"{x['call_sid']}: booking without its 2 reminders")
     # the three dashboards read the same calls
     check({d["roomName"] for d in ag["calls"].find()} == set(script), "ANGAD and CRM call logs differ")
     check(vb["call_transcript_intent_identification"].count_documents({}) == vb["call_recordings"].count_documents({}),

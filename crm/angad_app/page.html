@@ -467,7 +467,6 @@ pre{white-space:pre-wrap;font-size:11.5px;color:var(--muted);max-height:240px;ov
   <section id="s-positives"></section>
   <section id="s-negatives"></section>
   <section id="s-whatsapp"></section>
-  <section id="s-cohorts"></section>
   <section id="s-visits"></section>
   <section id="s-intent"></section>
   <section id="s-metrics"></section>
@@ -1498,9 +1497,12 @@ async function loadBuilder(){
     out.appendChild(el('h3',null,'How '+esc(x.persona)+' opens'));
     x.openings.forEach(o=>out.appendChild(el('div','cap','• '+esc(o))));
   });
-  out.appendChild(el('div','cap','Counts differ by orders of magnitude — Radhika dominates '+
-    'the corpus and the newer versions have only a handful of transcripts each. Treat the '+
-    'newer rows as directional, not as a measured comparison.'));
+  const vs_=(R.versions||[]).filter(x=>x.calls);
+  if(vs_.length>1){
+    const top_=vs_.reduce((a,b)=>b.calls>a.calls?b:a), few_=vs_.filter(x=>x.calls<20).map(x=>x.persona);
+    out.appendChild(el('div','cap','Counts differ: '+esc(top_.persona)+' has the most transcripts ('+top_.calls+')'+
+      (few_.length?'; '+esc(few_.join(', '))+' have only a handful each, so treat those rows as directional, not as a measured comparison.':'.')));
+  }
 }
 
 /* "Explain this number" (contract rule 5) */
@@ -1842,7 +1844,7 @@ const TABS=[
   ['visits','Site visits','⌂'],
 
   ['#','Reference',''],
-  ['numbers','Numbers','∑'],['cohorts','AI vs Human','⇄'],
+  ['numbers','Numbers','∑'],
   ['eras','Eras','◷'],['globe','Geography','◍'],['review','Review panel','?'],
 ];
 const TAB_ALIAS={fboard:'funnel3'};              // legacy click targets keep working
@@ -2227,8 +2229,7 @@ function render(){
   s=document.getElementById('s-whatsapp'); s.innerHTML='';
   s.appendChild(el('h2',null,'WhatsApp'));
   s.appendChild(el('div','note','From <code>Zoho_Database.whatsapp_messages</code> '+
-    '(per-lead aggregate) and <code>doc_send_log</code>. The WhatsApp fields inside '+
-    '<code>angad.calls</code> are all empty — the bot writes them here instead.'));
+    '(per-lead aggregate) and <code>doc_send_log</code> (every document the bot sent or was blocked from sending).'));
   s.appendChild(kpiRow(D.wa_kpis));
   s.appendChild(grid(2,
     card('What was sent (document type)',hbar(D.wa_docs)),
@@ -2374,32 +2375,6 @@ function render(){
     }
   }
 
-  // ---- AI vs Human cohorts
-  s=document.getElementById('s-cohorts'); s.innerHTML='';
-  if(D.cohorts&&D.cohorts.available){
-    const C=D.cohorts;
-    s.appendChild(el('h2',null,'AI caller vs Human callers \u2014 the standing comparison'));
-    s.appendChild(el('div','note','Sources: the <b>Humans &amp; AI Calling</b> workbook (auto-imported '+
-      'from Downloads on every sync) + the dialler log. Every row names its unit \u2014 '+
-      'lead rows, humans, or calls \u2014 so numbers from different systems are never mixed silently. '+
-      'Dialler-derived rows respect the current date filter.'));
-    s.appendChild(tableEl(C.compare));
-    if(C.attribution&&C.attribution.length){
-      s.appendChild(el('h2',null,'Attribution check \u2014 who really earned the visit?'));
-      s.appendChild(card('Manual verification of visits credited to the AI',
-        hbar(C.attribution),
-        'From the TRUE / FALSE sheets of the Confirmed Site Visits workbook.'));
-    }
-    if(C.daily){
-      s.appendChild(el('h2',null,'Daily: ops sheet vs system of record'));
-      s.appendChild(el('div','note','Where <b>sheet</b> and <b>sys</b> disagree, the system of '+
-        'record wins \u2014 the sheet is hand-maintained. Persistent gaps mean the sheet\u2019s '+
-        'definition drifted (it counts unique leads per day, not calls).'));
-      s.appendChild(tableEl(C.daily));
-    }
-  } else {
-    s.appendChild(el('div','cap','Cohort workbooks not imported \u2014 run: python import_cohorts.py'));
-  }
 
   // ---- Site visits
   s=document.getElementById('s-visits'); s.innerHTML='';
@@ -2456,7 +2431,7 @@ function render(){
       D.latency.median+'s, p90 '+D.latency.p90+'s over '+D.latency.n.toLocaleString()+
       ' calls. Slow starts (≥8s): '+D.latency.slow_share+'% of calls — drop rate '+
       D.latency.drop_when_slow+'% when slow vs '+D.latency.drop_when_fast+
-      '% when fast. Read with care: calls where the agent NEVER spoke are invisible to this proxy — catastrophic-latency drops are excluded by construction. Among calls that got a first turn, slow starts do NOT drop more.'));
+      '% when fast. Read with care: calls where the agent NEVER spoke are invisible to this proxy — catastrophic-latency drops are excluded by construction. Among calls that got a first turn, slow starts '+(D.latency.drop_when_slow>D.latency.drop_when_fast?'DO drop more.':'do not drop more.')));
   }
   s.appendChild(el('div','note','Per-call <b>latency</b> and <b>cost</b> are not '+
     'persisted anywhere (console-log / computed at runtime), so they cannot be '+

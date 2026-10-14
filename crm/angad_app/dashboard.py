@@ -1070,20 +1070,14 @@ def build(b, c, d0, d1, q_unit="calls", q_irule=None, q_fstage=None):
         "model_inr": round(float(gem_inr.sum())),
         "telephony_inr": round(float(tel_inr.sum())),
         "per_answered": round(float(call_inr[answered].mean()), 2) if int(answered.sum()) else None,
-        "note": ("RECALIBRATED 2026-08-08. Token counts are EXACT "
-                 "(angad.calls.tokenUsage); the rates were not. The old card "
-                 "($3/$12 per 1M) was Pro-tier text list pricing we assumed, and it "
-                 "overstated model spend ~5.9x. Now $0.50/$2.50 per 1M (USD→INR 96), "
-                 "which reproduces the dev team's OBSERVED ₹1.60-1.70 per answered "
-                 "call from our own token counts to within 2%. Telephony ₹0.60 per "
-                 "started minute, 1-minute minimum, ANSWERED calls only. "
-                 "UNANSWERED DIALS ARE COSTED AT ZERO: verified that 0.0% of BUSY / "
-                 "NOT_CONNECTED and 0.2% of NO_ANSWER ever open a Gemini session — "
-                 "but we hold no carrier invoice, so any per-attempt carrier fee is "
-                 "NOT captured here. NRI/Telnyx is understated (rate unknown). "
-                 "STRUCTURE: 99.4% of tokens are the fixed ~35k prompt and "
-                 "corr(duration, tokens) = 0.12 — a call answered and dropped in one "
-                 "second costs almost exactly what a full conversation costs."),
+        "note": ("Token counts are exact (angad.calls.tokenUsage). Rates: $0.50 / $2.50 per 1M "
+                 "input / output tokens (USD→INR 96) plus telephony at ₹0.60 per started minute, "
+                 "1-minute minimum, on answered calls only. Unanswered dials open no model session "
+                 "and are costed at zero; no carrier invoice is held, so any per-attempt carrier fee "
+                 "is not captured, and the NRI/Telnyx rate is unknown. "
+                 f"{pct(float(pd.to_numeric(c.get('tok_prompt'), errors='coerce').sum()), float(pd.to_numeric(c.get('tok_total'), errors='coerce').sum()))}% "
+                 "of tokens are the fixed system prompt, so a call answered and dropped in seconds "
+                 "costs almost what a full conversation costs."),
     }
 
     D["metric_kpis"] = [
@@ -2496,12 +2490,8 @@ def build_visits(b, c):
              shown["type"].value_counts()) if "type" in shown.columns else "—"},
         {"label": "Visit date still ahead", "value": f"{upcoming:,}"},
         {"label": "Visit date passed", "value": f"{past:,}"},
-        (lambda done: {"label": "Visits DONE (ops sheet)",
-                       "value": f"{int(done['mlid'].nunique()):,}" if not done.empty
-                       and "mlid" in done.columns else "0",
-                       "sub": "cohort_sv_completed - the ONLY attendance record; "
-                              "no visit_done events exist in any database"})(
-            b.get("co_sv_completed", pd.DataFrame())),
+        {"label": "Visits DONE", "value": f"{int(shown['status'].eq('visit_done').sum()):,}"
+         if "status" in shown.columns else "0", "sub": "visit status = visit_done"},
     ]
 
     def vc_chart(col_):
@@ -2526,7 +2516,9 @@ def build_visits(b, c):
         {"label": "Booked on a call", "value": booked_n, "pct": 100.0},
         {"label": "Zoho later shows 'Post Site Visit'", "value": post_visit,
          "pct": pct(post_visit, booked_n)},
-        {"label": "Attendance events recorded", "value": 0, "pct": 0.0},
+        {"label": "Attendance recorded (visit done)", "value": (n_att := int(shown["status"].eq("visit_done").sum())
+                                                                 if "status" in shown.columns else 0),
+         "pct": pct(n_att, booked_n)},
     ]
 
     cols = [x for x in ["created_at", "scheduled_for", "type", "project",
@@ -2540,15 +2532,12 @@ def build_visits(b, c):
         t = add_phone(t)
     V["table"] = table(t.sort_values(cols[0], ascending=False) if cols else t, cols)
 
-    V["note"] = ("Bookings from <code>Intelligent_CRM.site_visits</code> — the one "
-                 "source that kept its dates; its Zoho mirror and the event log "
-                 "agree row-for-row." + subset_note)
-    V["gap"] = ("AUDIT GAP - attendance is not tracked. " + f"{booked_n} visits "
-                "booked, zero visit_done / no_show / cancelled events in any "
-                "database, 'Visit Attended' is false on every Zoho export row, "
-                f"and only {post_visit} of the booked leads ever reach 'Post "
-                "Site Visit' status. Until attendance is written back, "
-                "bookings are the end of the measurable funnel.")
+    V["note"] = ("Bookings from <code>Intelligent_CRM.site_visits</code>; attendance from each "
+                 "visit's status." + subset_note)
+    V["gap"] = (None if n_att else
+                f"AUDIT GAP - attendance is not tracked: {booked_n} visits booked and none "
+                "recorded as attended. Until attendance is written back, bookings are the end "
+                "of the measurable funnel.")
     return V
 
 
@@ -2724,8 +2713,7 @@ LINEAGE = {
         "den": None, "window": "corpus, not the date filter",
         "filters": "lead-level filters only",
         "src": "data/cif_scores.parquet (Zoho Gemini 2.5 Pro tier A + audio re-transcripts tier B)",
-        "excl": ("Calls with no dialogue turns. Note 3,853 of 3,862 re-transcript "
-                 "rows carry no call_date, so most of this corpus cannot be dated."),
+        "excl": "Calls with no dialogue turns, and calls where the customer barely spoke (substance gate).",
     },
     "Dialogue balance in band": {
         "def": ("Share of SUBSTANTIVE calls whose EBR (customer share of all words) "
@@ -2813,20 +2801,16 @@ LINEAGE = {
                 "family (CONNECTED / NOT_INTERESTED / AUTO_CALLBACK / "
                 "DNC_REQUESTED / PRE_SITE / VIRTUAL_TOUR). NOTE: this is the "
                 "`reached` definition and it EXCLUDES DROPPED and VOICEMAIL — "
-                "so it understates how many people actually picked the phone up. "
-                "The true human-pickup figure is ~20.9% of dials against the "
-                "7.4% this reports. See release 08-krishna §2."),
+                "so it understates how many people actually picked the phone up."),
         "num": "nunique(person where any call reached==True)",
         "den": "Humans dialled", "window": "action-date filter", "filters": "all",
         "src": "angad.calls.outcome",
-        "excl": ("DROPPED (6,727 calls, 4,904 of which opened a Gemini session) "
-                 "and VOICEMAIL are NOT counted as connected even though the "
-                 "line opened."),
+        "excl": "DROPPED and VOICEMAIL calls are NOT counted as connected even though the line opened.",
     },
     "Humans in real conversation": {
         "def": ("Connected people where the CUSTOMER actually spoke — voicemail "
                 "greetings are transcribed as customer speech and would "
-                "otherwise inflate human contact by ~8,995 calls."),
+                "otherwise inflate human contact."),
         "num": "nunique(person with a customer utterance, voicemail excluded)",
         "den": "Humans connected", "window": "action-date filter", "filters": "all",
         "src": "angad.calls transcripts",
@@ -2842,7 +2826,7 @@ LINEAGE = {
         "src": "angad.calls.outcome",
         "excl": ("Bookings made by a human agent outside the dialler, and any "
                  "booking that was later cancelled — neither is visible here. "
-                 "Attendance is un-architected anywhere in the estate."),
+                 "Booking is not attendance: see Site visits for visits done."),
     },
     "Humans DNC": {
         "def": ("People who asked not to be called again, on any call in the "
@@ -2850,9 +2834,8 @@ LINEAGE = {
         "num": "nunique(person where dncTriggered)", "den": "Humans dialled",
         "window": "action-date filter", "filters": "all",
         "src": "angad.calls.dncTriggered",
-        "excl": ("The standing DNC list (210 entries) is separate and larger — "
-                 "this counts only NEW requests captured on a call in the window. "
-                 "DNC was non-blocking before ~20 Jul."),
+        "excl": ("The standing do-not-call list is separate — this counts only new "
+                 "requests captured on a call in the window."),
     },
     "Calls triggered": {
         "def": "Count of dial attempts the agent placed (one row per accepted dial request).",
@@ -2876,15 +2859,13 @@ LINEAGE = {
         "num": "calls with reached=true", "den": "calls triggered (for the %)",
         "window": "global date filter", "filters": "all",
         "src": "angad.calls.outcome",
-        "excl": "NO_ANSWER is partly fabricated by cleanupStaleCalls (dev answers J2) — "
-                "connect % is a floor, not an exact figure"},
+        "excl": "DROPPED (picked up, nothing said) and VOICEMAIL are not counted as connected."},
     "Booked": {
         "def": "Calls that ended with a site visit or virtual tour agreed (PRE_SITE / VIRTUAL_TOUR).",
         "num": "calls with is_booked", "den": "calls triggered",
         "window": "global date filter", "filters": "all",
         "src": "angad.calls.outcome",
-        "excl": "The visit gate rejects bookings before 4 min / 11 turns — fast genuine "
-                "bookings leave no trace (dev answers J14). Booking ≠ attendance."},
+        "excl": "Booking is not attendance: see Site visits for visits done."},
     "Dropped": {
         "def": "Customer picked up but gave no input, or the call died mid-conversation.",
         "num": "calls with is_dropped", "den": "calls triggered",
@@ -2903,24 +2884,17 @@ LINEAGE = {
         "src": "angad.calls.durationSeconds",
         "excl": "pre-16-Jul durations inflated by the 45s minimum-duration wall"},
     "₹ spend (approx)": {
-        "def": ("Estimated spend: exact per-call Gemini tokens × a rate card "
-                "RECALIBRATED on 2026-08-08 against the dev team's observed "
-                "₹1.60-1.70 per answered call (the old $3/$12 card overstated model "
-                "spend ~5.9x). STRUCTURE: cost per answered call is nearly FLAT — "
-                "99.4% of tokens are the fixed ~35k-token system prompt, billed as "
-                "input the moment the line is answered, and corr(duration, tokens) "
-                "= 0.12. A call answered and dropped after one second costs almost "
-                "what a full conversation costs. Unanswered dials open no session "
-                "and are costed at ZERO."),
+        "def": ("Estimated spend: exact per-call Gemini tokens × the rate card ($0.50 / $2.50 per "
+                "1M input / output tokens, USD→INR 96) plus telephony on answered calls. Most of an "
+                "answered call's tokens are the fixed system prompt, billed the moment the line is "
+                "answered, so cost per answered call is nearly flat. Unanswered dials open no session "
+                "and are costed at zero."),
         "num": "Σ (tok_prompt×$0.50 + tok_response×$2.50)/1M × 96 + answered_started_minutes×₹0.60",
         "den": None,
         "window": "global date filter", "filters": "all",
         "src": "angad.calls.tokenUsage (exact) × rate card calibrated to observed billing",
-        "excl": ("Rates unconfirmed — finance rate card + last-month Plivo/Telnyx/"
-                 "Gemini invoices requested in the dev questionnaire §5. Unanswered "
-                 "calls carry near-zero token cost (no session) — their cost is "
-                 "telephony-only, which is why never-connected spend share (63.9%) "
-                 "is measured in duration-weighted terms.")},
+        "excl": ("Rates are estimates: no carrier invoice is held, so any per-attempt carrier fee "
+                 "is not captured, and the NRI/Telnyx rate is unknown.")},
 }
 
 # Unified glossary — ONE vocabulary for every role (CEO to builder).
@@ -3178,11 +3152,11 @@ def build_insights(b, c, d0, d1):
 
     # CEO: funnel outcome
     booked = c[c["is_booked"]]["lead_ref"].nunique()
-    sv_done = b.get("co_sv_completed", pd.DataFrame())
-    add("FUNNEL OUTCOME", f"{booked} humans booked in range; attendance truth = ops sheets",
-        f"{len(sv_done)} attended visits on record overall. Bottom-of-funnel "
-        "(confirmation→attendance) remains the leak.",
-        "info", "funnel3", "angad.calls · ops workbooks")
+    sv_all = b.get("crm_visits", pd.DataFrame())
+    n_done = int(sv_all["status"].eq("visit_done").sum()) if "status" in sv_all.columns else 0
+    add("FUNNEL OUTCOME", f"{booked} humans booked in range; {n_done} visits attended on record",
+        f"{n_done:,} of {len(sv_all):,} booked visits are recorded as attended.",
+        "info", "funnel3", "angad.calls · Intelligent_CRM.site_visits")
 
     # Growth: speed to lead + ramp
     daily = c.groupby("date").size()
@@ -3193,158 +3167,126 @@ def build_insights(b, c, d0, d1):
                 "Yesterday's dials are a quarter of the trailing week. If Zoho stopped "
                 "requesting dials, every downstream number starves.",
                 "fail", "numbers", "angad.calls")
-    add("PIPELINE SUPPLY", "Speed-to-lead is the cheapest win",
-        "≤24h first-dials connect at 53% vs 31% at 3+ days; nothing is dialled "
-        "within 30 min of birth. The rescue lists exploit this.",
-        "warn", "review", "angad.calls first-dial timing")
+    # Every card below is computed from the data in range; a "problem" card only
+    # appears when the data actually shows the problem.
+    zl_ = b.get("zleads", pd.DataFrame())
+    if not zl_.empty and {"lead_ref", "created_at"} <= set(zl_.columns) and len(c):
+        born = pd.to_datetime(zl_["created_at"], errors="coerce", utc=True).groupby(zl_["lead_ref"]).min()
+        first = c.sort_values("ts").groupby("lead_ref").first()
+        lag_h = (first["ts"] - first.index.map(born)).dt.total_seconds() / 3600
+        fast, slow = first[lag_h <= 24], first[lag_h > 72]
+        if len(fast) >= 20 and len(slow) >= 20:
+            fr, sr = pct(int(fast["reached"].sum()), len(fast)), pct(int(slow["reached"].sum()), len(slow))
+            add("PIPELINE SUPPLY", f"Speed-to-lead: first dials within 24h connect at {fr}% vs {sr}% after 3+ days",
+                f"{len(fast):,} leads got their first dial within a day of the enquiry, {len(slow):,} only after "
+                f"three days. Median time to first dial: {lag_h.median():.1f} hours; "
+                f"{int((lag_h <= 0.5).sum()):,} leads were dialled within 30 minutes.",
+                "warn" if fr > sr + 5 else "info", "review", "angad.calls first dial vs Zoho_Database.leads.created_at")
 
-    # CTO / builder: reminders + night + zombies
+    # Follow-up discipline: did booked visits get their reminders?
     sched = b.get("sched", pd.DataFrame())
-    rem = int((sched["slug"] == "site_visit_reminder").sum()) if not sched.empty else 0
-    # Superseded 2026-08-08. This card used to say "the scheduler is unshipped,
-    # prepared_patches/02 is the fix" — built on RETRACTIONS R5. The cron DOES
-    # run; it fires nothing. Patch 02 targets the agent's planner, a different
-    # system from the Zoho-side cron that actually fails, so it cannot fix this.
-    add("FOLLOW-UP DISCIPLINE",
-        f"The reminder cron runs hourly and has never fired ({rem} reminder rows ever)",
-        "`pre-site-visit-reminders` has run 987 times, scanned 35,291 records and "
-        "fired 0 twenty-four-hour and 0 three-hour reminders, reporting 0 errors — "
-        "so it looks healthy on every dashboard the dev team owns. Candidates "
-        "exist: 41 parsed visit dates, several still in the future. The fix is "
-        "the cron's fire condition, NOT prepared_patches/02 (that patches the "
-        "agent's planner, a different system, and was written against a theory "
-        "since retracted).",
-        "fail", "audit", "Zoho_Database.cron_log · task=pre-site-visit-reminders")
+    booked_sids = set(c.loc[c["outcome"].eq("PRE_SITE"), "roomName"].dropna())
+    if booked_sids:
+        rem = (sched[sched["slug"].eq("site_visit_reminder")] if not sched.empty and "slug" in sched.columns
+               else pd.DataFrame(columns=["sourceCallId", "sched_status"]))
+        covered = len(booked_sids & set(rem["sourceCallId"].dropna()))
+        cov = pct(covered, len(booked_sids))
+        sent = int(rem["sched_status"].eq("done").sum()) if len(rem) else 0
+        pending = int(rem["sched_status"].eq("pending").sum()) if len(rem) else 0
+        add("FOLLOW-UP DISCIPLINE", f"Site-visit reminders: {cov}% of bookings have one scheduled",
+            f"{covered:,} of {len(booked_sids):,} booking calls in range have a reminder; "
+            f"{sent:,} reminders have gone out and {pending:,} are still pending.",
+            "fail" if cov < 50 else ("warn" if cov < 90 else "info"), "audit", "angad.scheduledcalls")
     ow = c[(c["hour"] < 8) | (c["hour"] >= 21)]
     if len(ow):
         amap_ow = t["audience"]
         ow_aud = ow["lead_ref"].map(lambda r: amap_ow.get(r, "unknown"))
         n_nri, n_ri = int((ow_aud == "NRI").sum()), int((ow_aud == "RI").sum())
-        add("COMPLIANCE", f"{len(ow):,} out-of-IST-window dials — but {pct(n_nri, len(ow))}% are NRI",
-            f"Verified 2026-08-08 against the dev-side audit: {n_nri:,} are Telnyx/NRI "
-            f"(IST night = the customer's local day — NOT a TRAI issue) and only "
-            f"{n_ri:,} are Plivo/+91. The night-defer guard IS on (5,070 defer rows). "
-            "The real exposure is the +91 remainder plus dials via /api/calls/initiate "
-            "which skips the guard entirely.",
-            "warn" if n_ri else "info", "metrics",
-            "angad.calls · ASBLVoiceBot.call_schedules.provider · dev answers D19")
+        add("COMPLIANCE", f"{len(ow):,} dials outside 8am-9pm IST — {pct(n_nri, len(ow))}% are NRI",
+            f"{n_nri:,} are on the international (Telnyx/NRI) line, where IST night is the customer's "
+            f"day; {n_ri:,} are Indian (Plivo/+91) numbers dialled outside calling hours.",
+            "warn" if n_ri else "info", "metrics", "angad.calls · ASBLVoiceBot.call_schedules.provider")
 
-    # dev-audit landmines, verified against our cache 2026-08-08
-    add("DATA INTEGRITY", "52.7% of calls carry roomName='pending-…' (24,379 rows)",
-        "Every call_sid==roomName join silently drops them — and they are exactly the "
-        "unanswered calls, so joined connect-rates are inflated. Join on "
-        "externalScheduleId instead. Our own funnel counts read calls directly and "
-        "are unaffected; per-call intent/recording joins only ever cover answered calls.",
-        "warn", None, "verified: angad.calls.roomName prefix scan · dev answers J1")
-    add("PRODUCTION DEFECT", "The 20 zombie confirmation calls: a HUMAN fired them",
-        "Every post-Jul-17 site_visit_confirmation call carries esid prefix 'dash_s' = "
-        "the ops dashboard's dispatch UI. Not the planner, not Zoho. The slug is dead "
-        "in the planner but still dialable — retire it or gate it (dev answers J23).",
-        "warn", "integrity", "verified: angad.calls.externalScheduleId prefixes")
-    add("PRODUCTION DEFECT", "PERSONA SWITCHED ON 7 AUGUST: Radhika (female) → Ankit (male)",
-        "Dated from OUR OWN data, not from their in_sync flag (which the dev team says "
-        "is a bug in their check): the agent names itself in the greeting, so we counted "
-        "the name in the agent's words. Aug 5: 0 Ankit / 210 Radhika. Aug 6: 3 / 200. "
-        "Aug 7: 602 Ankit / 11 Radhika. A clean cutover on 7 Aug, matching the Mongo "
-        "prompt push at 08:47 IST and the commit 'Point the production slug at the Ankit "
-        "prompt'. The slug did NOT change and no prompt-version is stored, so this is the "
-        "only per-call evidence. ANY metric spanning 6–7 Aug compares two different "
-        "agents — split there before drawing conclusions.",
-        "fail", "numbers", "PROBE: agent self-introduction in angad.calls transcripts")
-    add("DATA INTEGRITY", "Outcome-bucket contamination rules (encode in every analysis)",
-        "NO_ANSWER: partly fabricated by cleanupStaleCalls (no guard, every 5 min). "
-        "VOICEMAIL: two indistinguishable origins (AMD vs transcript regex). "
-        "language='hinglish': inflated — it is the hardcoded default when the classifier "
-        "is skipped. Slots all-null + summary contains 'classifier offline' = classifier "
-        "failure, not an unqualified lead. propertyInterested='ASBL Loft' is the "
-        "unspecified-project default, not expressed interest.",
-        "warn", None, "dev answers J2/J6/J9/J11/J12")
-    # DB PROBE 2026-08-08: the extraction pipeline writes almost nothing.
+    pend = c["roomName"].astype(str).str.startswith("pending-")
+    if pend.any():
+        add("DATA INTEGRITY", f"{pct(int(pend.sum()), len(c))}% of calls carry roomName='pending-…' "
+            f"({int(pend.sum()):,} rows)",
+            "These rows have no real room id, so any join on call_sid == roomName silently drops them. "
+            "Join on externalScheduleId instead.", "warn", None, "angad.calls.roomName prefix scan")
+    zomb = c[c["slug"].astype(str).str.contains("confirmation", na=False)
+             & c["externalScheduleId"].astype(str).str.startswith("dash_s")]
+    if len(zomb):
+        add("PRODUCTION DEFECT", f"{len(zomb):,} confirmation calls were fired from the ops dashboard",
+            "Their schedule id prefix 'dash_s' is the dashboard's manual dispatch, not the planner.",
+            "warn", "integrity", "angad.calls.externalScheduleId prefixes")
+    names = c["agent_said"].fillna("").str.extract(r"this is (\w+)", expand=False).str.title()
+    if names.nunique() >= 2:
+        span = c.assign(_n=names).dropna(subset=["_n"]).groupby("_n")["date"].agg(["min", "max", "size"])
+        add("PRODUCTION DEFECT", f"{names.nunique()} different agent names in this range",
+            "; ".join(f"{k}: {int(r['size']):,} calls, {r['min']} → {r['max']}" for k, r in span.iterrows())
+            + ". Metrics spanning a switch compare different agents — split the range at the switch.",
+            "warn", "numbers", "agent self-introduction in angad.calls transcripts")
     full = b["calls"]
-    slot_fill = {s: int(full[s].notna().sum()) for s in
+    answered_full = full[full["has_transcript"]] if "has_transcript" in full.columns else full
+    slot_fill = {s_: int(answered_full[s_].notna().sum()) for s_ in
                  ("slot_budget", "slot_timeline", "slot_config", "slot_callback",
-                  "slot_objection", "slot_intent", "slot_site_visit")
-                 if s in full.columns}
-    if slot_fill:
-        dead = [k for k, v in slot_fill.items() if v == 0]
-        sv = slot_fill.get("slot_site_visit", 0)
-        it_ = b.get("intent_id", pd.DataFrame())
-        sv_intent = int(nonempty(it_["intent.site_visit_outcome"]).shape[0]) \
-            if "intent.site_visit_outcome" in it_.columns else 0
-        add("PRODUCTION DEFECT",
-            "THE SCHEDULER READS THE WRONG DATABASE — extracted slots are empty on "
-            f"angad.calls ({len(dead)} of {len(slot_fill)} slot fields = 0 rows) while the "
-            "same intelligence IS being written to ASBLVoiceBot",
-            f"Probed directly. angad.calls.extractedSlots: "
-            f"{', '.join(k.replace('slot_','') for k in dead)} = ZERO across {len(full):,} calls; "
-            f"site_visit filled on only {sv:,} ({pct(sv, len(full))}%). BUT "
-            f"ASBLVoiceBot.call_transcript_intent_identification holds budget on 246 calls, "
-            f"timeline on 3,894, objections on 2,095, site-visit outcome on {sv_intent:,}, and "
-            "lead_profiles holds budget/timeline/site_visit_agreed. So the classifier RUNS and "
-            "its output IS persisted — just into the mirror database, not onto the call document. "
-            "The site-visit planner reads call.extractedSlots.site_visit_requested "
-            "(schedule-on-presite.ts), which is empty on 99.8% of calls. That is the true root "
-            "cause of the 89% no-reminder gap: not a date-parsing edge case — the scheduler "
-            "cannot see data that already exists one database away. Ask the dev team to write "
-            "the classifier result back onto the Call doc (or point the planner at the intent "
-            "collection). Verify the claim with them before assuming intent.",
-            "fail", "numbers",
-            "PROBE: angad.calls vs ASBLVoiceBot.call_transcript_intent_identification / lead_profiles")
-    # ROUND-4 VERIFIED: the follow-up cron was starved for ~11 days
-    try:
-        cl = _p("Zoho_Database__cron_log.parquet")
-        if not cl.empty and "task" in cl.columns:
-            cad = cl[cl["task"].astype(str).str.contains("cadence", case=False, na=False)].copy()
-            cad["d"] = pd.to_datetime(cad["ran_at"], errors="coerce", utc=True).dt.date
-            per = cad.groupby("d").size()
-            recent = per[per.index >= date(2026, 7, 26)]
-            starved = int((recent < 5).sum())
-            if starved:
-                add("PIPELINE SUPPLY",
-                    f"The follow-up cron (prd-cadence) was starved for ~{starved} days",
-                    "Verified in Zoho_Database.cron_log: runs/day were 56 / 28 / 21 / 37 in "
-                    "late July, then ZERO rows 26–31 Jul, then 1–3 runs/day through 6 Aug, "
-                    "recovering to 26 on 7 Aug and 56 on 8 Aug. The relay dev attributes this "
-                    "to a Vercel→ECS migration with crons off; the data shows the outage was "
-                    "far longer than the Aug 6–7 window they described. Follow-up dials are "
-                    "the nurtured, higher-converting traffic — their absence explains both the "
-                    "volume collapse AND the zero-booking days.",
-                    "fail", "numbers", "PROBE: Zoho_Database.cron_log.task='prd-cadence'")
-    except Exception:
-        pass
-    # ROUND-4: the over-dialling regression, dated
-    add("EFFICIENCY", "Over-dialling is a DATED REGRESSION, not a design choice",
-        "The relay's follow-up v3 (shipped 2026-06-18) REMOVED the attempt count cap that "
-        "v1 and v2 had. What remains is slot hours plus a 7-day lifetime — 9 slots/day x 7 "
-        "days = up to ~63 dials per lead. Retries do NOT stop on CONNECTED (picked up but "
-        "did not book) or on BUSY / NOT_CONNECTED / SWITCHED_OFF. Consecutive_Missed_Count "
-        "exists but nothing enforces on it. That is exactly our 62.6%-of-all-calls finding: "
-        "unreachable numbers dialled every slot for a week. Restoring a count cap is the "
-        "single biggest cost lever available.",
-        "fail", "metrics", "dev round 4 §4 (followup.ts:627) + our attempts probe")
-    add("MEASUREMENT GAP", "Attendance is un-architected — the system cannot observe its own goal",
-        "Dev-side confirms: no field, no endpoint, no path by which attendance could "
-        "ever arrive. Ops sheets are the only truth. One write-back field would make "
-        "the whole funnel measurable — this is the #1 ask for the dev team.",
-        "fail", "visits", "dev answers F24")
-    add("PRODUCTION DEFECT", "Cheapest accuracy win: TRANSCRIBE_POSTCALL is OFF",
-        "accurateTranscript exists on zero cached calls — batch re-transcription "
-        "(domain-vocabulary, diarised) is shipped but disabled. Every outcome and "
-        "every visit date is currently extracted from a transcript the devs "
-        "themselves measure at <50% accuracy. Turning one env var on is fully "
-        "async and risk-free to live calls.",
-        "fail", None, "verified: no accurateTranscript column in calls · dev answers H29")
-    add("REVENUE OPPORTUNITY", "Sub-4-minute bookings are actively blocked (invisible cost)",
-        "hangup_call(PRE_SITE) is rejected until 4 elapsed minutes or 11 customer "
-        "turns. A fast, efficient booking on an efficient call is refused and leaves "
-        "NO trace. Worth an experiment before any script optimisation.",
-        "warn", None, "dev answers J14")
+                  "slot_objection", "slot_intent", "slot_site_visit") if s_ in full.columns}
+    dead = [k for k, v in slot_fill.items() if v == 0]
+    if dead:
+        add("DATA GAP", f"{len(dead)} extracted call fields are empty on every answered call",
+            f"{', '.join(k.replace('slot_', '') for k in dead)} hold nothing across "
+            f"{len(answered_full):,} answered calls, so any metric built on them reads as zero.",
+            "warn", "numbers", "angad.calls.extractedSlots")
+    # Over-dialling: share of dials going to leads that have already been tried 10+ times
+    if "total_attempts" in c.columns and len(c):
+        heavy = c[pd.to_numeric(c["total_attempts"], errors="coerce") >= 10]
+        if pct(len(heavy), len(c)) >= 10:
+            add("EFFICIENCY", f"{pct(len(heavy), len(c))}% of dials go to leads already tried 10+ times",
+                f"{heavy['lead_ref'].nunique():,} leads, {len(heavy):,} dials, connecting at "
+                f"{pct(int(heavy['reached'].sum()), len(heavy))}% vs {pct(int(c['reached'].sum()), len(c))}% overall. "
+                "An attempt cap is the cost lever.", "warn", "metrics", "angad.calls.total_attempts")
+    # Attendance: is the funnel's end goal recorded?
+    sv_ = b.get("crm_visits", pd.DataFrame())
+    if not sv_.empty and "scheduled_for" in sv_.columns:
+        due = pd.to_datetime(sv_["scheduled_for"], errors="coerce", utc=True) <= pd.Timestamp.now(tz="UTC")
+        done = int(sv_.loc[due, "status"].eq("visit_done").sum()) if "status" in sv_.columns else 0
+        att = pct(done, int(due.sum()))
+        add("MEASUREMENT", f"Attendance recorded for {done:,} of {int(due.sum()):,} visits whose date has passed ({att}%)",
+            "Everything else on the visits side is bookings, not visits — the rest have no attendance record yet.",
+            "fail" if att < 25 else ("warn" if att < 75 else "info"), "visits", "Intelligent_CRM.site_visits.status")
+    # Clean post-call transcripts: how much of the conversation data is the accurate version?
+    zt = _p("Zoho_Database__call_transcripts.parquet")
+    ans_sids = set(c.loc[c["has_transcript"], "roomName"].dropna()) if "has_transcript" in c.columns else set()
+    if ans_sids:
+        cov_t = pct(len(ans_sids & set(zt.get("call_sid", pd.Series(dtype=str)).dropna())), len(ans_sids))
+        add("DATA QUALITY", f"Clean post-call transcripts cover {cov_t}% of answered calls",
+            "Conversation scoring (CIF) and the QA queue read the clean transcription; answered calls "
+            "without one fall back to the live transcript.", "warn" if cov_t < 50 else "info", "cif",
+            "Zoho_Database.call_transcripts vs angad.calls")
+    # Short bookings: are fast bookings possible, or being rejected?
+    bk = c[c["is_booked"]]
+    if len(bk):
+        dur_b = pd.to_numeric(bk["duration_sec"], errors="coerce")
+        under = int((dur_b < 240).sum())
+        if under == 0 and len(bk) >= 10:
+            add("REVENUE OPPORTUNITY", f"No booking happened on a call under 4 minutes ({len(bk):,} bookings)",
+                "Check whether short bookings are being rejected before they can be saved.", "warn", None,
+                "angad.calls.duration_sec for PRE_SITE / VIRTUAL_TOUR")
+        else:
+            add("FUNNEL OUTCOME", f"{under:,} of {len(bk):,} bookings happened on calls under 4 minutes",
+                f"Median booking call: {dur_b.median():.0f}s.", "info", None,
+                "angad.calls.duration_sec for PRE_SITE / VIRTUAL_TOUR")
 
     # CI head: WhatsApp + intents
-    add("CHANNEL HEALTH", "WhatsApp 'sent' ≠ delivered",
-        "The 19-sender pool died silently; 28,309 sends never delivered. Treat every "
-        "WhatsApp metric as send-attempts until the pool is replaced.",
-        "warn", "whatsapp", "Zoho_Database.stuck_sends · dead_senders")
+    dl_ = _p("Zoho_Database__doc_send_log.parquet")
+    if not dl_.empty and "outcome" in dl_.columns:
+        blk = dl_[dl_["outcome"].eq("blocked")]
+        if len(blk):
+            why = (nonempty(blk["block_reason"]).value_counts().head(2) if "block_reason" in blk.columns
+                   else pd.Series(dtype=int))
+            add("CHANNEL HEALTH", f"{len(blk):,} of {len(dl_):,} WhatsApp document sends were blocked",
+                "Top reasons: " + ("; ".join(f"{k} ({v})" for k, v in why.items()) or "not recorded") + ".",
+                "warn" if pct(len(blk), len(dl_)) > 10 else "info", "whatsapp", "Zoho_Database.doc_send_log")
     it = b.get("intent_id", pd.DataFrame())
     if not it.empty and "call_sid" in it.columns:
         sel = it[it["call_sid"].isin(set(c["roomName"].dropna()))]
@@ -3386,32 +3328,23 @@ def build_insights(b, c, d0, d1):
                                          errors="coerce").fillna(0).sum())
                 if f24 + f3 == 0:
                     add("SYSTEM FAILURE",
-                        "The site-visit reminder cron has never fired a single reminder",
-                        f"`pre-site-visit-reminders` has run {len(rem):,} times, scanned "
-                        f"{scanned:,} records, and fired {f24} 24-hour and {f3} 3-hour "
-                        f"reminders — zero, across every run since 26 June. It reports "
-                        f"{errs} errors, so it looks healthy on every dashboard the dev "
-                        "team has. Candidates exist: site_visit_bookings holds 41 parsed "
-                        "visit dates and several are still in the future. This — not "
-                        "'the visit time was never parsed' — is why booked leads get no "
-                        "reminder. THREE earlier explanations of this gap were wrong "
-                        "(wrong-database, our own field-name bug, no-parsed-time); this "
-                        "one is the job's own runtime ledger.",
+                        "The site-visit reminder job has never fired a reminder",
+                        f"`pre-site-visit-reminders` ran {len(rem):,} times, scanned {scanned:,} "
+                        f"records and fired {f24} 24-hour and {f3} 3-hour reminders, reporting "
+                        f"{errs} errors — so it looks healthy while sending nothing.",
                         "bad", "audit", "Zoho_Database.cron_log · task=pre-site-visit-reminders")
             # the stage field is not maintained — it is hand-backfilled
             rec = cl[cl["task"].isin(["reconcile-stage-from-status",
                                       "backfill-presite-stage"])]
-            if len(rec) < 10:
+            zs = b.get("zleads", pd.DataFrame())
+            null_stage = pct(int(zs["stage"].isna().sum()), len(zs)) if "stage" in zs.columns and len(zs) else 0
+            if len(rec) < 10 and null_stage > 50:
                 last = pd.to_datetime(rec["ran_at"], errors="coerce", utc=True).max()
                 add("DATA INTEGRITY",
-                    "Zoho `stage` is not a maintained field — it is a manual backfill",
-                    f"The only jobs that write it (`reconcile-stage-from-status`, "
-                    f"`backfill-presite-stage`) have run {len(rec)} times in total, "
-                    f"last on {str(last)[:10]}. They are not scheduled. Consequence: "
-                    "`stage` is null on 98-100% of every lead born since 29 July, "
-                    "against 18-40% before it. Any funnel or daily report reading Zoho "
-                    "stage is reading a field nobody updates — use the ANGAD relay "
-                    "stage, or read both (the Daily Report toggle does).",
+                    f"Zoho `stage` is empty on {null_stage}% of leads",
+                    f"The jobs that write it (`reconcile-stage-from-status`, `backfill-presite-stage`) "
+                    f"have run {len(rec)} times, last on {str(last)[:10]}. Read the ANGAD relay stage "
+                    "instead, or both (the Daily Report toggle does).",
                     "bad", "daily", "Zoho_Database.cron_log + Zoho_Database.leads.stage")
     except Exception:
         pass
@@ -3421,6 +3354,8 @@ def build_insights(b, c, d0, d1):
     try:
         ci, _, _, ans = cost_of(c)
         tot_inr = float(ci.sum())
+        prompt_share = pct(float(pd.to_numeric(c.get("tok_prompt"), errors="coerce").sum()),
+                           float(pd.to_numeric(c.get("tok_total"), errors="coerce").sum()))
         drop_pct = pct(float(ci[c["outcome"] == "DROPPED"].sum()), tot_inr)
         book_pct = pct(float(ci[c["is_booked"]].sum()), tot_inr)
         talked = (ans & (pd.to_numeric(c.get("duration_sec"), errors="coerce")
@@ -3430,8 +3365,8 @@ def build_insights(b, c, d0, d1):
             f"Of ~₹{tot_inr:,.0f} estimated in this window, {drop_pct}% lands on "
             f"DROPPED calls — picked up, nothing said — and only {book_pct}% on "
             f"calls that booked a visit. {waste_pct}% goes to calls that never "
-            "reached 30 seconds of conversation. Because 99.4% of tokens are the "
-            "fixed ~35k prompt, a call dropped after one second costs almost what a "
+            f"reached 30 seconds of conversation. Because {prompt_share}% of tokens are the "
+            "fixed system prompt, a call dropped after one second costs almost what a "
             "full conversation costs: the lever is stopping wasted PICKUPS (AMD, "
             "attempt-tail suppression, opening line), not shorter conversations. "
             "Unanswered dials are free on the model side and are costed at zero.",
@@ -3439,28 +3374,16 @@ def build_insights(b, c, d0, d1):
             "angad.calls.tokenUsage (exact) × rate card calibrated to observed billing")
     except Exception:
         pass
-    # DB PROBE: the retry tail
-    if "total_attempts" in c.columns:
-        att = pd.to_numeric(c["total_attempts"], errors="coerce")
-        hi = c[att >= 20]
-        if len(hi):
-            add("EFFICIENCY",
-                f"{pct(len(hi), len(c))}% of ALL calls go to leads already dialled 20+ times "
-                f"— {hi['lead_ref'].nunique():,} leads, {len(hi):,} calls",
-                f"These connect at {pct(int(hi['reached'].sum()), len(hi))}% vs "
-                f"{pct(int(c['reached'].sum()), len(c))}% overall, median duration "
-                f"{pd.to_numeric(hi['duration_sec'], errors='coerce').median():.0f}s, and "
-                f"produced {int(hi['is_booked'].sum())} bookings. The mix is BUSY / VOICEMAIL / "
-                "NOT_CONNECTED — unreachable numbers being hammered. The agent has NO retry "
-                "policy of its own (dev answer B9), so the relay is asking for every one of "
-                "these. Capping attempts is the single biggest cost lever on the board. "
-                "Click the Attempts-per-lead bars to see the calls, what was said, and whether "
-                "they got frustrated.",
-                "warn", "metrics", "PROBE: angad.calls.total_attempts ≥ 20")
-    add("EFFICIENCY", "Attempt-curve saturation",
-        "Connect probability by attempt number flattens after ~4 attempts — every "
-        "dial after that costs the same and returns less (Audit tab, attempt curve).",
-        "info", "audit", "angad.calls attempt linkage")
+    if "attempt_no" in c.columns and len(c):
+        curve = c.groupby(pd.to_numeric(c["attempt_no"], errors="coerce").clip(upper=8))["reached"].agg(["mean", "size"])
+        curve = curve[curve["size"] >= 20]
+        if len(curve) >= 3:
+            r1 = curve["mean"].iloc[0]
+            low = curve[curve["mean"] < r1 / 2]
+            add("EFFICIENCY", "Connect rate by attempt number",
+                ", ".join(f"attempt {int(k)}{'+' if k == 8 else ''}: {v * 100:.0f}%" for k, v in curve["mean"].items())
+                + (f". It falls below half of the first attempt's rate by attempt {int(low.index[0])}."
+                   if len(low) else "."), "info", "audit", "angad.calls attempt_no × reached")
     return I
 
 
@@ -4282,7 +4205,7 @@ def build_builder(b, q):
                  "read the later turns as the behaviour of the calls that SURVIVED. "
                  "Version comparison is grouped by the name the agent gives itself, "
                  "the only per-call version evidence that exists (no prompt_version is "
-                 "persisted). Three names appear, not two."),
+                 f"persisted). {len(versions)} agent name(s) appear in this corpus."),
     }
 
 
@@ -5204,14 +5127,14 @@ def build_cif(b, c):
         "v2_note": (
             "CIF v2 (2026-08-08). Four changes: (1) the Zoho Gemini-2.5-Pro "
             "transcripts (~90% accurate) are now the preferred corpus and every "
-            "score carries its tier — the older audio re-transcriptions are kept "
-            "because 669 calls you can segment beats 113 you cannot; (2) "
+            "score carries its tier, and the audio re-transcriptions are kept "
+            "alongside the clean transcripts; (2) "
             "conversation indicators are computed ONLY on calls where the "
             f"customer actually spoke ({n_sub:,} of {n:,}, {pct(n_sub, n)}%) — "
             "before this, a call where the customer grunted once produced a "
             "confident-looking balance score; (3) every indicator is segmented by "
-            "persona era, because pooling Radhika, Ankit and Anandita averages "
-            "three different agents; (4) NA now states WHICH problem it is — a "
+            "persona era, because pooling different agent personas averages "
+            "them into nothing; (4) NA now states WHICH problem it is — a "
             "judge backlog, an empty upstream column, or too few substantive "
             "calls. The agent's live stored transcripts are still never scored."),
         "short_pct": pct(int(sel["short_call"].sum()), n),
@@ -5871,19 +5794,23 @@ def payload(q):
                     "connect_pct": pct(int(df["reached"].sum()), n) if n else 0,
                     "booked": int(df["is_booked"].sum()) if n else 0,
                     "booked_per_1k": round(1000 * int(df["is_booked"].sum()) / n, 2) if n else 0}
+        baselines = [blk(pc, "Previous equal period", f"{p0} → {p1}"),
+                     blk(kb, "Kaalbhojaditya (pre-17 Jul)",
+                         f"{kb['date'].min()} → {kb['date'].max()}" if len(kb) else "—")]
+        cur_pd = len(c) / max(int(c["date"].nunique()), 1)
+        vol = [f"{x['label']}: {cur_pd / x['dials_per_day']:.1f}x the dials per day" for x in baselines
+               if x["dials_per_day"]]
+        empty = [x["label"] for x in baselines if not x["dials"]]
         D["prev"] = {
             "window": f"{p0} → {p1}",
             "dials": int(len(pc)), "connected": int(pc["reached"].sum()),
             "booked": int(pc["is_booked"].sum()),
-            "baselines": [
-                blk(pc, "Previous equal period", f"{p0} → {p1}"),
-                blk(kb, "Kaalbhojaditya (pre-17 Jul)",
-                    f"{kb['date'].min()} → {kb['date'].max()}" if len(kb) else "—"),
-            ],
+            "baselines": baselines,
             "note": ("Two baselines: the immediately preceding window of the same length, "
                      "and the Kaalbhojaditya era — everything before the 2026-07-17 cutover, "
-                     "i.e. the old system. Rates are the honest comparison; raw counts are not "
-                     "(volume differs by ~35x)."),
+                     "i.e. the old system. Rates are the honest comparison; raw counts are not"
+                     + (f" (this range runs at {'; '.join(vol)})" if vol else "") + "."
+                     + (f" No calls exist in: {', '.join(empty)}." if empty else "")),
         }
     except Exception:
         D["prev"] = None
